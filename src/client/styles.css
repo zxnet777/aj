@@ -1,0 +1,15 @@
+body { font-family: system-ui, 'PingFang SC', sans-serif; background: #f7f8fa; margin: 0 }
+.app { max-width: 720px; margin: 0 auto; padding: 12px }
+nav { display: flex; gap: 8px; margin: 12px 0 }
+nav button { padding: 8px 12px; border: none; border-radius: 10px; background: #e8eefc; cursor: pointer }
+.login { max-width: 320px; margin: 80px auto; display: flex; flex-direction: column; gap: 10px }
+.login input { padding: 10px; border: 1px solid #ddd; border-radius: 10px }
+.login button { padding: 10px; border: none; border-radius: 10px; background: #4f7cff; color: #fff }
+.err { color: #e23 }
+.gamebar { padding: 8px 12px; background: #fff; border-radius: 10px; font-weight: 600 }
+.companion { display: flex; gap: 8px; align-items: center; margin: 10px 0 }
+.companion .avatar { background: #4f7cff; color: #fff; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; font-size: 12px }
+.companion .bubble { background: #fff; padding: 8px 12px; border-radius: 12px }
+.mistake { background: #fff; padding: 10px; border-radius: 10px; margin: 8px 0 }
+.sel { background: #d6e2ff }
+button { font-family: inherit }
