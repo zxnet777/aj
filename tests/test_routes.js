@@ -23,12 +23,15 @@ function request(method, path, body, token) {
   });
 }
 
-test('GET /api/progress without token -> 401', async () => {
+test('GET /api/progress (self-use, no login) -> 200', async () => {
   const res = await request('GET', '/api/progress');
-  assert.equal(res.status, 401);
+  assert.equal(res.status, 200);
+  const body = JSON.parse(res.body);
+  assert.ok('points' in body && 'level' in body);
 });
 
-test('GET /api/mistakes without token -> 401', async () => {
+test('GET /api/mistakes (self-use, no login) -> 200', async () => {
   const res = await request('GET', '/api/mistakes');
-  assert.equal(res.status, 401);
+  assert.equal(res.status, 200);
+  assert.ok(Array.isArray(JSON.parse(res.body)));
 });

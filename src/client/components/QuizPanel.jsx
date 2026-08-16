@@ -69,6 +69,20 @@ export default function QuizPanel() {
   };
 
   if (!q) return <p>加载中…</p>;
+  // 该考点无本地题且无 AI：给出明确提示，不再回退到无关学科演示题
+  if (q.noLocalQuestion) {
+    return (
+      <div>
+        <h2>智能刷题</h2>
+        <p className="quiz-kp">当前考点：<b>{kp}</b></p>
+        <div className="quiz-feedback no">
+          <p>📚 {q.note || '该考点暂未录入本地题库。'}</p>
+          <p>建议：先点顶部「总结卡」复习该考点；或在电脑上配置 <code>DEEPSEEK_API_KEY</code> 后由 AI 即时出题。</p>
+          <button onClick={() => { setKp(Object.values(outline?.[sub] || {})[0]?.[0] || ''); }}>换一个已录入的考点</button>
+        </div>
+      </div>
+    );
+  }
   return (
     <div>
       <h2>智能刷题</h2>

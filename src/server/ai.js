@@ -77,8 +77,13 @@ export async function generateQuiz({ subject, knowledgePoint, difficulty = 2 }) 
       const pick = pool[Math.floor(Math.random() * pool.length)];
       return { ...pick, subject, knowledgePoint };
     }
-    // 无本地题时回退演示题，并标注来源避免误导
-    return { ...MOCK.quiz, subject, knowledgePoint, note: '该考点题库筹备中，先用通用演示题' };
+    // 无本地题且无 AI：明确告知，不再回退到无关学科的演示题
+    return {
+      subject,
+      knowledgePoint,
+      noLocalQuestion: true,
+      note: '该考点暂未录入本地题库，可先复习总结卡；配置 DEEPSEEK_API_KEY 后可由 AI 即时出题。'
+    };
   }
   return callWithFallback(async () => {
     const msgs = [

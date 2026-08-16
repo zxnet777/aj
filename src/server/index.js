@@ -74,7 +74,23 @@ export { app };
 
 // 仅当直接运行（node src/server/index.js）时启动监听；被测试 import 时不自动监听
 import { fileURLToPath } from 'node:url';
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  // 监听 0.0.0.0 以便同一局域网内的 iPad 通过电脑 IP 访问
-  app.listen(process.env.PORT || 3001, '0.0.0.0', () => console.log('server up on http://0.0.0.0:' + (process.env.PORT || 3001)));
+import { resolve } from 'node:path';
+import net from 'node:net';
+if (resolve(process.argv[1]).toLowerCase() === fileURLToPath(import.meta.url).toLowerCase()) {
+  const PORT = Number(process.env.PORT) || 3001;
+  // 仅供本机访问：监听 127.0.0.1，比 0.0.0.0 更安全
+  const probe = net.createServer();
+  probe.once('error', (e) => {
+    if (e.code === 'EADDRINUSE') {
+      console.error(`[启动失败] 端口 ${PORT} 已被占用。请先停止旧服务（双击 stop.bat 或结束 node 进程）再启动。`);
+      process.exit(1);
+    }
+    throw e;
+  });
+  probe.once('listening', () => {
+    probe.close(() => {
+      app.listen(PORT, '127.0.0.1', () => console.log('server up on http://127.0.0.1:' + PORT));
+    });
+  });
+  probe.listen(PORT, '127.0.0.1');
 }

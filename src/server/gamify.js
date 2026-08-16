@@ -8,7 +8,9 @@ export function addPoints(userId, delta) {
 }
 
 export function checkIn(userId) {
-  const today = new Date().toISOString().slice(0, 10);
+  // 用本地（中国）日期而非 UTC，避免跨午夜打卡日期错位
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const exists = db.prepare('SELECT 1 FROM checkins WHERE user_id=? AND day=?').get(userId, today);
   if (exists) {
     const streak = db.prepare('SELECT streak FROM users WHERE id=?').get(userId).streak;
