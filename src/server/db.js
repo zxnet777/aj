@@ -60,3 +60,15 @@ try { db.exec('ALTER TABLE knowledge_mastery ADD COLUMN reviews INTEGER DEFAULT 
 // 错题表补充选项与解析，便于错题本回显复习
 try { db.exec('ALTER TABLE mistakes ADD COLUMN options TEXT'); } catch {}
 try { db.exec('ALTER TABLE mistakes ADD COLUMN explanation TEXT'); } catch {}
+
+// 自用单用户模式：确保存在一个固定的"我"(id=1)，免去登录。
+// 首次启动若库中无用户则插入，后续复用，保证进度/错题/积分落在同一账号。
+export function ensureUser() {
+  const SELF_ID = 1;
+  const exists = db.prepare('SELECT 1 FROM users WHERE id=?').get(SELF_ID);
+  if (!exists) {
+    db.prepare('INSERT INTO users (id,username,password) VALUES (?,?,?)')
+      .run(SELF_ID, 'self', 'self');
+  }
+  return SELF_ID;
+}
