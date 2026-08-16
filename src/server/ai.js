@@ -107,21 +107,28 @@ export async function generateQuiz({ subject, knowledgePoint, difficulty = 2 }) 
 }
 
 export async function analyzeWeakness(records) {
-  return callWithFallback(async () => {
-    const msgs = [
-      {
-        role: 'system',
-        content: SYSTEM + ' 根据做题记录返回 JSON:{"redLight":["薄弱考点"],"greenLight":["掌握考点"]}'
-      },
-      { role: 'user', content: '记录:' + JSON.stringify(records) }
-    ];
-    const r = await getClient().chat.completions.create({
-      model: 'deepseek-chat',
-      messages: msgs,
-      response_format: { type: 'json_object' }
-    });
-    return JSON.parse(r.choices[0].message.content);
-  }, MOCK.weakness);
+  // 本地直接计算，离线可用、随做题记录实时更新，不再返回固定演示数据
+  return computeWeaknessFromRecords(records || []);
+}
+
+// 基于本地 quiz_records 实时计算薄弱/已掌握，避免首页永远显示固定假数据
+function computeWeaknessFromRecords(records) {
+  const stat = {}; // kp -> {total, correct}
+  for (const r of records) {
+    const kp = r.knowledgePoint || r.knowledge_point;
+    if (!kp) continue;
+    if (!stat[kp]) stat[kp] = { total: 0, correct: 0 };
+    stat[kp].total += 1;
+    if (r.correct) stat[kp].correct += 1;
+  }
+  const redLight = [], greenLight = [];
+  for (const [kp, s] of Object.entries(stat)) {
+    if (s.total < 2) continue; // 样本太少不评判
+    const rate = s.correct / s.total;
+    if (rate <= 0.5) redLight.push(kp);
+    else if (rate >= 0.8) greenLight.push(kp);
+  }
+  return { redLight, greenLight };
 }
 
 export async function summarizeKnowledge({ subject, chapter, knowledgePoint }) {

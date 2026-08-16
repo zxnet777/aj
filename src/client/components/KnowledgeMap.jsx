@@ -2,6 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import Companion from './Companion.jsx';
 
+function findChapter(outline, kp) {
+  if (!outline) return null;
+  for (const subject in outline) for (const chapter in outline[subject]) {
+    if (outline[subject][chapter].includes(kp)) return chapter;
+  }
+  return null;
+}
+
 // 掌握度 -> 红绿灯颜色
 function light(m) {
   if (!m) return '⚪';
@@ -45,6 +53,17 @@ export default function KnowledgeMap() {
     // 合并接口：一次拿到大纲 + 中考考法 + 统一掌握度，减少串行请求
     api.getTree().then((d) => {
       setOutline(d.outline); setExamFocus(d.examFocus || {}); setMastery(d.mastery || {});
+      // 从刷题页"看总结卡"过来：大纲就绪后自动展开并打开对应考点
+      const pending = window.__pendingSummary;
+      if (pending && pending.knowledgePoint) {
+        const subject = pending.subject || Object.keys(d.outline)[0];
+        const chapter = findChapter(d.outline, pending.knowledgePoint);
+        if (subject && chapter) {
+          setOpen((o) => ({ ...o, [subject]: true, [subject + '/' + chapter]: true }));
+          summarize(subject, chapter, pending.knowledgePoint);
+        }
+        window.__pendingSummary = null;
+      }
     }).catch((e) => setErr('加载知识地图失败：' + e.message));
     api.getProgress().then((p) => setBadges(p.badges || [])).catch(() => {});
   }, []);
