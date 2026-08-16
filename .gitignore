@@ -1,5 +1,8 @@
 node_modules/
 dist/
 app.db
+app.db-shm
+app.db-wal
 *.log
+test_out.txt
 .env

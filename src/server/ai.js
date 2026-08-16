@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { QUIZBANK } from './quizbank.js';
 let client;
 function getClient() {
   if (!client) {
@@ -29,7 +30,14 @@ const MOCK = {
     explanation: '配方：y=(x-1)²-4，顶点为 (1,-4)。选 A 正确！',
     difficulty: 2
   },
-  weakness: { redLight: ['二次函数', '阅读理解'], greenLight: ['一元一次方程'] }
+  weakness: { redLight: ['二次函数', '阅读理解'], greenLight: ['一元一次方程'] },
+  summary: {
+    concept: '这个知识点暂未预置详细卡片，先记住核心定义，再理解它和前后知识的联系。',
+    easyMistakes: ['容易混淆相似概念', '忽略前提条件导致套错公式'],
+    trick: '一句口诀帮你记牢：xxx',
+    example: '典型例题 + 一步到位的解法思路。',
+    examFocus: ['中考常以选择题/解答题考查', '常结合生活情境命题']
+  }
 };
 
 async function callWithFallback(realCall, mock) {
@@ -58,15 +66,29 @@ export async function explainQuestion({ subject, question, history = [] }) {
 }
 
 export async function generateQuiz({ subject, knowledgePoint, difficulty = 2 }) {
+  // mock 模式：优先用本地湖州/浙江中考风格题库（按知识点精准出对口题）
+  if (usingMock) {
+    const bank = (QUIZBANK[knowledgePoint] || []).filter((x) => x);
+    if (bank.length) {
+      // 难度自适应：优先在同难度档选题，无同难度则整体随机，保证刷题梯度有效
+      const want = Number(difficulty) || 2;
+      const same = bank.filter((q) => Number(q.difficulty) === want);
+      const pool = same.length ? same : bank;
+      const pick = pool[Math.floor(Math.random() * pool.length)];
+      return { ...pick, subject, knowledgePoint };
+    }
+    // 无本地题时回退演示题，并标注来源避免误导
+    return { ...MOCK.quiz, subject, knowledgePoint, note: '该考点题库筹备中，先用通用演示题' };
+  }
   return callWithFallback(async () => {
     const msgs = [
       {
         role: 'system',
-        content: SYSTEM + ' 出题请返回 JSON:{"question","options":["A..","B.."],"answer":"A","explanation","difficulty"}'
+        content: SYSTEM + ' 出题请返回 JSON:{"question","options":["A..","B.."],"answer":"A","explanation","difficulty"}，题目面向浙江湖州中考风格'
       },
       {
         role: 'user',
-        content: `科目:${subject} 考点:${knowledgePoint} 难度:${difficulty}/5，出一道选择题`
+        content: `科目:${subject} 考点:${knowledgePoint} 难度:${difficulty}/5，出一道选择题（结合湖州/浙江中考考情）`
       }
     ];
     const r = await getClient().chat.completions.create({
@@ -74,7 +96,8 @@ export async function generateQuiz({ subject, knowledgePoint, difficulty = 2 }) 
       messages: msgs,
       response_format: { type: 'json_object' }
     });
-    return JSON.parse(r.choices[0].message.content);
+    const q = JSON.parse(r.choices[0].message.content);
+    return { ...q, subject, knowledgePoint };
   }, MOCK.quiz);
 }
 
@@ -94,4 +117,25 @@ export async function analyzeWeakness(records) {
     });
     return JSON.parse(r.choices[0].message.content);
   }, MOCK.weakness);
+}
+
+export async function summarizeKnowledge({ subject, chapter, knowledgePoint }) {
+  return callWithFallback(async () => {
+    const msgs = [
+      {
+        role: 'system',
+        content: SYSTEM + ' 请为初三学生总结一个知识点，返回 JSON:{"concept":"核心定义与理解","easyMistakes":["易错点1","易错点2"],"trick":"记忆口诀或技巧","example":"一道典型例题与解法","examFocus":["中考常见考法1","中考常见考法2"]}'
+      },
+      {
+        role: 'user',
+        content: `科目:${subject} 章节:${chapter} 知识点:${knowledgePoint}，帮我整理总结成体系化的卡片`
+      }
+    ];
+    const r = await getClient().chat.completions.create({
+      model: 'deepseek-chat',
+      messages: msgs,
+      response_format: { type: 'json_object' }
+    });
+    return JSON.parse(r.choices[0].message.content);
+  }, MOCK.summary);
 }

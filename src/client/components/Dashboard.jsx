@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import Companion from './Companion.jsx';
+import { BADGES } from '../badges.js';
 
 export default function Dashboard() {
   const [prog, setProg] = useState(null);
   useEffect(() => { api.getProgress().then(setProg).catch(() => {}); }, []);
+  const badges = prog?.badges || [];
   return (
     <div>
-      <Companion />
+      <Companion text="欢迎回来～这里不是用来「逼你学」的，是帮你把知识点理清楚、变轻松的小助手。每天花几分钟，挑一个模糊的点理一理，慢慢就顺了。" />
       <h2>我的学习仪表盘</h2>
       {prog && (
         <ul>
@@ -17,7 +19,20 @@ export default function Dashboard() {
           <li>已掌握：{(prog.weakness?.greenLight || []).join('、') || '暂无'}</li>
         </ul>
       )}
-      <button onClick={() => alert('开始今日 1 个轻松小挑战！')}>今日小挑战</button>
+
+      <div className="km-badges">
+        {BADGES.map((b) => {
+          const got = badges.includes(b.key);
+          return (
+            <div key={b.key} className={'km-badge' + (got ? ' got' : '')} title={got ? b.name : (b.type === 'streak' ? `连续 ${b.at} 天解锁` : `点亮 ${b.at} 个解锁`)}>
+              <span className="km-badge-emoji">{b.emoji}</span>
+              <span className="km-badge-name">{b.name}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      <button onClick={() => window.dispatchEvent(new CustomEvent('goto-tab', { detail: 'knowledge' }))}>今天理 1 个知识点 →</button>
     </div>
   );
 }

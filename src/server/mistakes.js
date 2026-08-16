@@ -1,9 +1,9 @@
 import { db } from './db.js';
 import { analyzeWeakness } from './ai.js';
 
-export function addMistake(userId, { subject, knowledgePoint, question, answer }) {
-  db.prepare('INSERT INTO mistakes (user_id,subject,knowledge_point,question,answer) VALUES (?,?,?,?,?)')
-    .run(userId, subject, knowledgePoint, question, answer);
+export function addMistake(userId, { subject, knowledgePoint, question, answer, options, explanation }) {
+  db.prepare('INSERT INTO mistakes (user_id,subject,knowledge_point,question,answer,options,explanation) VALUES (?,?,?,?,?,?,?)')
+    .run(userId, subject, knowledgePoint, question, answer, options ? JSON.stringify(options) : null, explanation || null);
 }
 
 export function getMistakes(userId) {

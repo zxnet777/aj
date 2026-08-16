@@ -16,5 +16,9 @@ export const api = {
   quizAnswer: (b) => req('/quiz/answer', { method: 'POST', body: JSON.stringify(b) }),
   getProgress: () => req('/progress'),
   getMistakes: () => req('/mistakes'),
-  getMeta: () => req('/meta')
+  getMeta: () => req('/meta'),
+  getOutline: () => req('/knowledge/outline'),
+  getTree: () => req('/knowledge/tree'),
+  getMastery: () => req('/knowledge/mastery'),
+  summarize: (b) => req('/knowledge/summarize', { method: 'POST', body: JSON.stringify(b) })
 };
