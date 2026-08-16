@@ -13,6 +13,7 @@ export const api = {
   quizAnswer: (b) => req('/quiz/answer', { method: 'POST', body: JSON.stringify(b) }),
   getProgress: () => req('/progress'),
   getMistakes: () => req('/mistakes'),
+  reset: () => req('/reset', { method: 'POST' }),
   getMeta: () => req('/meta'),
   getOutline: () => req('/knowledge/outline'),
   getTree: () => req('/knowledge/tree'),

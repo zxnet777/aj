@@ -5,7 +5,14 @@ import { BADGES } from '../badges.js';
 
 export default function Dashboard() {
   const [prog, setProg] = useState(null);
-  useEffect(() => { api.getProgress().then(setProg).catch(() => {}); }, []);
+  const load = () => api.getProgress().then(setProg).catch(() => {});
+  useEffect(() => {
+    load();
+    // 重置后刷新仪表盘，薄弱/已掌握等统计回到初始
+    const onReset = () => load();
+    window.addEventListener('data-reset', onReset);
+    return () => window.removeEventListener('data-reset', onReset);
+  }, []);
   const badges = prog?.badges || [];
   return (
     <div>

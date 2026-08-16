@@ -50,6 +50,15 @@ export default function KnowledgeMap() {
   const [tip] = useState(() => DAILY_TIPS[new Date().getDate() % DAILY_TIPS.length]);
 
   useEffect(() => {
+    loadTree();
+    api.getProgress().then((p) => setBadges(p.badges || [])).catch(() => {});
+    // 重置后重新加载树与进度，回到初始未点亮状态
+    const onReset = () => { loadTree(); setBadges([]); setCard(null); };
+    window.addEventListener('data-reset', onReset);
+    return () => window.removeEventListener('data-reset', onReset);
+  }, []);
+
+  const loadTree = () => {
     // 合并接口：一次拿到大纲 + 中考考法 + 统一掌握度，减少串行请求
     api.getTree().then((d) => {
       setOutline(d.outline); setExamFocus(d.examFocus || {}); setMastery(d.mastery || {});
@@ -65,8 +74,7 @@ export default function KnowledgeMap() {
         window.__pendingSummary = null;
       }
     }).catch((e) => setErr('加载知识地图失败：' + e.message));
-    api.getProgress().then((p) => setBadges(p.badges || [])).catch(() => {});
-  }, []);
+  };
 
   // 计算进度
   useEffect(() => {
@@ -166,66 +174,73 @@ export default function KnowledgeMap() {
         </div>
       )}
 
-      {Object.entries(outline).map(([subject, chapters]) => (
-        <div key={subject} className="km-subject">
-          <button className="km-head" onClick={() => toggle(subject)}>
-            {open[subject] ? '▾' : '▸'} {subject}
-          </button>
-          {open[subject] && (
-            <div className="km-chapters">
-              {Object.entries(chapters).map(([chapter, kps]) => (
-                <div key={chapter} className="km-chapter">
-                  <button className="km-head" onClick={() => toggle(subject + '/' + chapter)}>
-                    {open[subject + '/' + chapter] ? '▾' : '▸'} {chapter}
-                  </button>
-                  {open[subject + '/' + chapter] && (
-                    <ul className="km-kps">
-                      {kps.map((kp) => (
-                        <li key={kp}>
-                          <span className="km-light">{light(master(subject, kp))}</span>
-                          <span>{kp}</span>
-                          {(examFocus[kp] || []).map((t, i) => (
-                            <span key={i} className="km-tag" title="中考常见考法">{t}</span>
+      <div className="km-layout">
+        <div className="km-tree">
+          {Object.entries(outline).map(([subject, chapters]) => (
+            <div key={subject} className="km-subject">
+              <button className="km-head" onClick={() => toggle(subject)}>
+                {open[subject] ? '▾' : '▸'} {subject}
+              </button>
+              {open[subject] && (
+                <div className="km-chapters">
+                  {Object.entries(chapters).map(([chapter, kps]) => (
+                    <div key={chapter} className="km-chapter">
+                      <button className="km-head" onClick={() => toggle(subject + '/' + chapter)}>
+                        {open[subject + '/' + chapter] ? '▾' : '▸'} {chapter}
+                      </button>
+                      {open[subject + '/' + chapter] && (
+                        <ul className="km-kps">
+                          {kps.map((kp) => (
+                            <li key={kp}>
+                              <span className="km-light">{light(master(subject, kp))}</span>
+                              <span>{kp}</span>
+                              {(examFocus[kp] || []).map((t, i) => (
+                                <span key={i} className="km-tag" title="中考常见考法">{t}</span>
+                              ))}
+                              <button className="km-sum" onClick={() => summarize(subject, chapter, kp)}>帮我总结</button>
+                            </li>
                           ))}
-                          <button className="km-sum" onClick={() => summarize(subject, chapter, kp)}>帮我总结</button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+                        </ul>
+                      )}
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div className="km-detail">
+          {busy && <p>阿杰学长正在帮你整理…</p>}
+          {card && (
+            <div className="km-card">
+              <Companion text={praise(card.kp, card.gained || 0, (card.gained || 0) >= 8)} />
+              {card.source === 'local' && <p className="km-source">本地预置总结（湖州中考向）· 配置 DeepSeek Key 后可升级为个性化讲解</p>}
+              <h3>{card.subject} · {card.kp} <span className="km-light">{light(card.mastery)} {card.mastery}%</span></h3>
+              <p className="km-chapter-label">对应课本：{card.chapter}</p>
+              <p className="km-review">已复习 {card.reviewCount || 1} 次{card.reviewCount > 1 ? '（红圈越复习越容易变黄/绿）' : ''}</p>
+              <div className="km-actions">
+                <button className="km-quiz" onClick={() => {
+                  const detail = { subject: card.subject, knowledgePoint: card.kp };
+                  window.__pendingQuiz = detail;
+                  window.dispatchEvent(new CustomEvent('goto-quiz', { detail }));
+                  window.dispatchEvent(new CustomEvent('goto-tab', { detail: 'quiz' }));
+                }}>
+                  🔥 去刷这一题，做对就变绿 →
+                </button>
+              </div>
+              <p><b>核心理解：</b>{card.concept}</p>
+              <p><b>易错点：</b></p>
+              <ul>{(card.easyMistakes || []).map((x, i) => <li key={i}>{x}</li>)}</ul>
+              <p><b>记忆口诀：</b>{card.trick}</p>
+              <p><b>典型例题：</b>{card.example}</p>
+              <p><b>中考常见考法：</b></p>
+              <ul>{(card.examFocus && card.examFocus.length ? card.examFocus : ['（暂无，点过"帮我总结"后由阿杰学长补充）']).map((x, i) => <li key={i}>{x}</li>)}</ul>
             </div>
           )}
+          {!card && !busy && <p className="km-detail-tip">👈 在左侧点开一个知识点，点「帮我总结」就能在这里看到详细讲解卡片。</p>}
         </div>
-      ))}
-
-      {busy && <p>阿杰学长正在帮你整理…</p>}
-      {card && (
-        <div className="km-card">
-          <Companion text={praise(card.kp, card.gained || 0, (card.gained || 0) >= 8)} />
-          {card.source === 'local' && <p className="km-source">本地预置总结（湖州中考向）· 配置 DeepSeek Key 后可升级为个性化讲解</p>}
-          <h3>{card.subject} · {card.kp} <span className="km-light">{light(card.mastery)} {card.mastery}%</span></h3>
-          <p className="km-chapter-label">对应课本：{card.chapter}</p>
-          <p className="km-review">已复习 {card.reviewCount || 1} 次{card.reviewCount > 1 ? '（红圈越复习越容易变黄/绿）' : ''}</p>
-          <div className="km-actions">
-            <button className="km-quiz" onClick={() => {
-              const detail = { subject: card.subject, knowledgePoint: card.kp };
-              window.__pendingQuiz = detail;
-              window.dispatchEvent(new CustomEvent('goto-quiz', { detail }));
-              window.dispatchEvent(new CustomEvent('goto-tab', { detail: 'quiz' }));
-            }}>
-              🔥 去刷这一题，做对就变绿 →
-            </button>
-          </div>
-          <p><b>核心理解：</b>{card.concept}</p>
-          <p><b>易错点：</b></p>
-          <ul>{(card.easyMistakes || []).map((x, i) => <li key={i}>{x}</li>)}</ul>
-          <p><b>记忆口诀：</b>{card.trick}</p>
-          <p><b>典型例题：</b>{card.example}</p>
-          <p><b>中考常见考法：</b></p>
-          <ul>{(card.examFocus && card.examFocus.length ? card.examFocus : ['（暂无，点过"帮我总结"后由阿杰学长补充）']).map((x, i) => <li key={i}>{x}</li>)}</ul>
-        </div>
-      )}
+      </div>
     </div>
   );
 }

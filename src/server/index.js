@@ -1,7 +1,7 @@
 import express from 'express';
 import { explainQuestion, generateQuiz, usingMock } from './ai.js';
 import { addPoints, getBadges } from './gamify.js';
-import { addMistake, getMistakes, getWeakness } from './mistakes.js';
+import { addMistake, getMistakes, getWeakness, resetUser } from './mistakes.js';
 import { getOutline, computeMastery, getMastery, mergeMastery, summarize } from './knowledge.js';
 import { db, ensureUser } from './db.js';
 
@@ -51,6 +51,14 @@ app.get('/api/progress', async (req, res) => {
 });
 
 app.get('/api/mistakes', (req, res) => res.json(getMistakes(SELF_ID)));
+
+// 重置：清空当前用户全部使用数据，回到初始阶段（保留账号）
+app.post('/api/reset', (req, res) => {
+  try {
+    resetUser(SELF_ID);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
 app.get('/api/knowledge/outline', (req, res) => {
   res.json({ ...getOutline(), mastery: mergeMastery(SELF_ID) });

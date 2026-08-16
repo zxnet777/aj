@@ -94,3 +94,16 @@ button { font-family: inherit }
 /* 知识地图错误提示 */
 .km-err { background: #fdecec; color: #c0392b; padding: 8px 12px; border-radius: 10px; margin-bottom: 8px; font-size: 13px; cursor: pointer }
 .banner.err { background: #fdecec; color: #c0392b }
+/* 重置按钮（导航栏右侧危险操作，需二次确认） */
+nav .nav-reset { background: #ffe9e9; color: #c0392b }
+nav .nav-reset:hover { background: #ffd6d6 }
+/* 知识地图：左侧知识树 + 右侧讲解卡，并排便于对照 */
+.km-layout { display: flex; gap: 14px; align-items: flex-start }
+.km-tree { flex: 1 1 50%; min-width: 0 }
+.km-detail { flex: 1 1 50%; min-width: 0; position: sticky; top: 8px }
+.km-detail-tip { color: #889; font-size: 13px; background: #fff; border-radius: 12px; padding: 14px; text-align: center }
+/* 窄屏（手机）自动堆叠为上下布局 */
+@media (max-width: 640px) {
+  .km-layout { flex-direction: column }
+  .km-detail { position: static; width: 100% }
+}

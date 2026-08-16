@@ -3,7 +3,14 @@ import { api } from '../api.js';
 
 export default function MistakeBook() {
   const [list, setList] = useState([]);
-  useEffect(() => { api.getMistakes().then(setList).catch(() => {}); }, []);
+  const load = () => api.getMistakes().then(setList).catch(() => {});
+  useEffect(() => {
+    load();
+    // 重置后重新拉取，确保错题本清空
+    const onReset = () => load();
+    window.addEventListener('data-reset', onReset);
+    return () => window.removeEventListener('data-reset', onReset);
+  }, []);
   const parse = (v) => { try { return JSON.parse(v); } catch { return null; } };
   return (
     <div>
