@@ -4,6 +4,8 @@ app.db
 app.db-shm
 app.db-wal
 *.log
+server.err
+server.log
 test_out.txt
 tap_opt.txt
 tap_kn.txt
