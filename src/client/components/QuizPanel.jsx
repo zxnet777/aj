@@ -1,20 +1,21 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { api } from '../api.js';
 import Companion from './Companion.jsx';
 
 const LETTERS = ['A', 'B', 'C', 'D', 'E'];
 
 export default function QuizPanel() {
+  // 初始考点：优先取知识页"去刷题"带过来的 pending，否则给个默认入口
+  const pending = typeof window !== 'undefined' && window.__pendingQuiz;
   const [outline, setOutline] = useState(null);
   const [subjects, setSubjects] = useState([]);
-  const [sub, setSub] = useState('数学');
-  const [kp, setKp] = useState('二次函数');
+  const [sub, setSub] = useState(pending?.subject || '数学');
+  const [kp, setKp] = useState(pending?.knowledgePoint || '二次函数概念与图象');
   const [q, setQ] = useState(null);
   const [diff, setDiff] = useState(2);
   const [sel, setSel] = useState('');
   const [feedback, setFeedback] = useState(null); // {correct, text}
   const [submitting, setSubmitting] = useState(false);
-  const fetchingRef = useRef(false);
 
   // 加载大纲，用于科目/知识点选择器
   useEffect(() => {
@@ -27,17 +28,16 @@ export default function QuizPanel() {
   const points = outline ? Object.values(outline[sub] || {}).flat() : [];
 
   const next = async () => {
-    if (fetchingRef.current) return;
-    fetchingRef.current = true;
     setFeedback(null);
     setSel('');
     try {
       const r = await api.quizNext({ subject: sub, knowledgePoint: kp, difficulty: diff });
       setQ(r);
-    } finally {
-      fetchingRef.current = false;
+    } catch (e) {
+      setFeedback({ correct: false, text: '加载题目失败：' + e.message });
     }
   };
+  // 科目或知识点变化即拉题（sub/kp 已含跳转带来的最新值，无竞态）
   useEffect(() => { next(); }, [sub, kp]); // eslint-disable-line
   // 从知识页一键过来刷这个考点：自动切科目/知识点并开始
   useEffect(() => {
@@ -47,7 +47,7 @@ export default function QuizPanel() {
     window.addEventListener('goto-quiz', onGoto);
     if (window.__pendingQuiz) { setSub(window.__pendingQuiz.subject || sub); setKp(window.__pendingQuiz.knowledgePoint); window.__pendingQuiz = null; }
     return () => window.removeEventListener('goto-quiz', onGoto);
-  }, [sub]);
+  }, []); // eslint-disable-line
 
   const answer = async () => {
     if (!q || submitting) return;
