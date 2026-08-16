@@ -24,7 +24,7 @@ npm run start      # 启动后端（监听 127.0.0.1:3001 并托管 dist/）
 
 浏览器访问 `http://localhost:3001`。项目根目录还提供了 **`打开阿杰学长.url`**，可拖到桌面双击直达。
 
-> 需要 Node.js 18+（已在 `D:\Program Files\nodejs` 或 `C:\Program Files\nodejs` 时无需额外配置）。
+> 需要 Node.js 22+（后端使用实验模块 `node:sqlite`；已在 `D:\Program Files\nodejs` 或 `C:\Program Files\nodejs` 时无需额外配置）。
 
 
 ## 环境变量（可选）
@@ -40,7 +40,7 @@ npm run start      # 启动后端（监听 127.0.0.1:3001 并托管 dist/）
 ## 技术栈
 
 - 前端：React 18 + Vite
-- 后端：Express + `better-sqlite3`（同步 SQLite）
+- 后端：Express + `node:sqlite`（Node 22+ 内置实验模块，同步 SQLite）
 - AI：配置 `DEEPSEEK_API_KEY` 走真实 DeepSeek，否则回退本地题库/预置总结
 
 ## 目录结构
@@ -50,7 +50,7 @@ src/server/
   index.js        Express 入口与路由（单用户，免登录）
   db.js           SQLite 初始化、表结构、旧库迁移
   knowledge.js    大纲、掌握度计算、总结卡
-  quizbank.js     本地湖州/浙江中考风格题库（语文考点已全量录入）
+  quizbank.js     本地湖州/浙江中考风格题库（全科 137 个考点已全量录入）
   ai.js           AI 讲解/总结/出题（含演示回退）
   mistakes.js     错题本
   gamify.js       积分与徽章
@@ -64,9 +64,9 @@ tests/            node:test 用例
 
 ## 刷题说明
 
-- 语文全部考点已录入本地题库，点「去刷题」即出对应真题。
-- 数学/科学/英语/道法/历史等科目多数考点暂未录入本地题；未录入的考点点「去刷题」时，界面会明确提示「该考点暂未录入题库，可先复习总结卡」，而不会再回退到无关学科的演示题。
-- 配置 `DEEPSEEK_API_KEY` 后，未录入的考点可由 AI 即时生成对应题目。
+- 全科（语文/数学/英语/科学/道德与法治/历史与社会）共 **137 个中考考点已全部录入本地题库**，每个考点均配有中考风格真题，点「去刷题」即出对应题目。
+- 本地题库覆盖不全或想换思路时，可配置 `DEEPSEEK_API_KEY`，由 AI 即时生成更多对应题目与讲解。
+- 未配置 key 时走演示模式：本地题库 + 预置中考考法总结卡，完全离线可用。
 
 ## 常用脚本
 
