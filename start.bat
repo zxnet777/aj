@@ -7,7 +7,7 @@ if exist "D:\Program Files\nodejs\node.exe" set "PATH=D:\Program Files\nodejs;%P
 if exist "C:\Program Files\nodejs\node.exe" set "PATH=C:\Program Files\nodejs;%PATH%"
 
 rem 端口占用检测：若 3001 已被占用，提示用 stop.bat 停止旧服务
-powershell -NoProfile -Command "try { $c=New-Object Net.Sockets.TcpClient; $c.Connect('127.0.0.1',3001); $c.Close(); exit 0 } catch { exit 1 }"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0check-port.ps1"
 if not errorlevel 1 (
   echo [阿杰学长] 端口 3001 已被占用，服务可能已在运行。
   echo 浏览器打开 http://localhost:3001 即可；如需重启请先双击 stop.bat。
