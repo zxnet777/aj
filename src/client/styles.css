@@ -107,3 +107,80 @@ nav .nav-reset:hover { background: #ffd6d6 }
   .km-layout { flex-direction: column }
   .km-detail { position: static; width: 100% }
 }
+
+/* 知识地图卡片：上一/下一考点导航 */
+.km-nav { display: flex; align-items: center; gap: 8px; margin: 6px 0 12px; flex-wrap: wrap }
+.km-nav button { background: #eef2ff; color: #4356c8; border: none; border-radius: 18px; padding: 6px 12px; cursor: pointer }
+.km-nav button:disabled { opacity: .4; cursor: not-allowed }
+.km-nav-pos { color: #99a; font-size: 12px }
+
+/* 刷题：选项状态 */
+.quiz-retry-tag { background: #fff4e6; color: #d97706; border-radius: 10px; padding: 6px 10px; font-size: 13px; display: inline-block }
+.quiz-msg { color: #2b8a3e; font-size: 13px }
+.quiz-err { color: #c0392b }
+.opt-letter { font-weight: 700; margin-right: 8px }
+.quiz-option.opt-correct { background: #e6f9ec; border-color: #34c759; color: #1a7f37 }
+.quiz-option.opt-wrong { background: #fdeaea; border-color: #ff3b30; color: #c0392b }
+.quiz-option.opt-selected { border-color: #4356c8; background: #eef2ff }
+.quiz-note { color: #888; font-size: 13px; background: #fffbe6; border-radius: 8px; padding: 8px }
+.quiz-feedback .ok { color: #1a7f37 } .quiz-feedback .no { color: #c0392b }
+.quiz-explain { color: #444; font-size: 14px; background: #f6f7fb; border-radius: 8px; padding: 8px }
+.quiz-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px }
+.quiz-submit, .quiz-next { background: #4356c8; color: #fff; border: none; border-radius: 10px; padding: 10px 16px; cursor: pointer }
+.quiz-fav { background: #fff7e6; color: #b8860b; border: none; border-radius: 10px; padding: 10px 14px; cursor: pointer }
+.quiz-ask { background: #eef2ff; color: #4356c8; border: none; border-radius: 10px; padding: 10px 14px; cursor: pointer }
+.quiz-summary { background: #f0fdf4; color: #2b8a3e; border: none; border-radius: 10px; padding: 10px 14px; cursor: pointer }
+.quiz-empty { color: #889; background: #fff; border-radius: 12px; padding: 14px }
+
+/* 错题本：筛选 + 点一条重刷 */
+.mb-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px }
+.mb-filters select { padding: 8px; border-radius: 8px; border: 1px solid #ddd }
+.mb-retry-all { background: #4356c8; color: #fff; border: none; border-radius: 10px; padding: 8px 14px; cursor: pointer }
+.mb-empty, .mb-empty { color: #889 }
+.mb-list { list-style: none; padding: 0; margin: 0 }
+.mb-item { background: #fff; border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; cursor: pointer; border-left: 4px solid #ff3b30; transition: box-shadow .15s }
+.mb-item:hover { box-shadow: 0 2px 10px rgba(0,0,0,.08) }
+.mb-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 12px; color: #888 }
+.mb-subject { background: #eef2ff; color: #4356c8; border-radius: 6px; padding: 2px 8px }
+.mb-time { margin-left: auto; color: #aaa }
+.mb-q { margin: 6px 0; font-weight: 500 }
+.mb-ans { font-size: 13px; color: #555; margin: 0 }
+.mb-mine { color: #c0392b } .mb-ans b { color: #1a7f37 }
+.mb-go { margin-top: 8px; background: #4356c8; color: #fff; border: none; border-radius: 8px; padding: 6px 12px; cursor: pointer }
+
+/* 问学长：历史栏 */
+.chat-bar { display: flex; justify-content: space-between; align-items: center }
+.chat-clear { background: #f3f4f6; color: #666; border: none; border-radius: 8px; padding: 6px 10px; cursor: pointer; font-size: 13px }
+.chat-empty { color: #889; background: #fff; border-radius: 12px; padding: 14px }
+.chat-err { color: #c0392b }
+
+/* 首页仪表盘：连续天数 + 可点击考点 */
+.dash-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px }
+.dash-card { background: #fff; border-radius: 14px; padding: 14px; flex: 1 1 140px; text-align: center }
+.dash-card .big { font-size: 26px; font-weight: 700; color: #4356c8 }
+.dash-card.streak .big { color: #e8590c }
+.streak-dots { display: flex; gap: 4px; justify-content: center; margin-top: 8px }
+.streak-dots .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block }
+.streak-dots .dot.on { background: #ff922b } .streak-dots .dot.off { background: #e9ecef }
+.streak-hint { font-size: 11px; color: #aaa; margin-top: 4px }
+.dash-cols { display: flex; gap: 14px; flex-wrap: wrap }
+.dash-col { flex: 1 1 260px; background: #fff; border-radius: 14px; padding: 14px }
+.dash-col h3 { margin-top: 0 }
+.dash-list { list-style: none; padding: 0; margin: 0 }
+.dash-item { padding: 8px 10px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 6px }
+.dash-item:hover { background: #f1f3ff }
+.dash-item .dot { width: 10px; height: 10px; border-radius: 50% }
+.dash-item .dot.red { background: #ff3b30 } .dash-item .dot.green { background: #34c759 }
+.dash-item .rate { color: #aaa; font-size: 12px }
+.dash-none { color: #889; font-size: 14px }
+.dash-badges { background: #fff; border-radius: 14px; padding: 14px; margin-top: 14px }
+.badge-row { display: flex; gap: 8px; flex-wrap: wrap }
+.badge { background: #fff7e6; color: #b8860b; border-radius: 18px; padding: 6px 12px; font-size: 13px }
+
+/* 刷题页：考点输入自动联想下拉 */
+.quiz-controls { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; position: relative; z-index: 2 }
+.quiz-kp-wrap { position: relative; flex: 1 1 220px }
+.quiz-kp-wrap input { width: 100%; box-sizing: border-box }
+.quiz-candidates { position: absolute; top: 100%; left: 0; right: 0; list-style: none; padding: 0; margin: 4px 0 0; background: #fff; border: 1px solid #ddd; border-radius: 10px; max-height: 240px; overflow-y: auto; box-shadow: 0 6px 18px rgba(0,0,0,.1); z-index: 10 }
+.quiz-candidates li { padding: 10px 12px; cursor: pointer; border-bottom: 1px solid #f2f2f2 }
+.quiz-candidates li:hover { background: #eef2ff }

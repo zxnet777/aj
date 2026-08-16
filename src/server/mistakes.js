@@ -18,6 +18,22 @@ export function getMistakes(userId) {
   return db.prepare('SELECT * FROM mistakes WHERE user_id=? ORDER BY created_at DESC').all(userId);
 }
 
+// 收藏/取消收藏一道难题（同一用户+同题 upsert，再次调用则取消）
+export function toggleFavorite(userId, { subject, knowledgePoint, question, answer, options, explanation }) {
+  const existing = db.prepare('SELECT id FROM favorites WHERE user_id=? AND question=?').get(userId, question);
+  if (existing) {
+    db.prepare('DELETE FROM favorites WHERE id=?').run(existing.id);
+    return { favorited: false };
+  }
+  db.prepare('INSERT INTO favorites (user_id,subject,knowledge_point,question,answer,options,explanation) VALUES (?,?,?,?,?,?,?)')
+    .run(userId, subject, knowledgePoint, question, answer, options ? JSON.stringify(options) : null, explanation || null);
+  return { favorited: true };
+}
+
+export function getFavorites(userId) {
+  return db.prepare('SELECT * FROM favorites WHERE user_id=? ORDER BY created_at DESC').all(userId);
+}
+
 // 将某一用户的使用数据整体清空，回到初始状态（保留用户账号本身）。
 // 涵盖：错题本、刷题记录、知识点掌握度、徽章、积分/等级/连续天数。
 export function resetUser(userId) {
@@ -26,6 +42,7 @@ export function resetUser(userId) {
   db.prepare('DELETE FROM knowledge_mastery WHERE user_id=?').run(userId);
   db.prepare('DELETE FROM badges WHERE user_id=?').run(userId);
   db.prepare('DELETE FROM checkins WHERE user_id=?').run(userId);
+  db.prepare('DELETE FROM favorites WHERE user_id=?').run(userId);
   db.prepare('UPDATE users SET points=0, level=1, streak=0 WHERE id=?').run(userId);
 }
 

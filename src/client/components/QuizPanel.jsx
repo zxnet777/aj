@@ -1,134 +1,254 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../api.js';
-import Companion from './Companion.jsx';
 
-const LETTERS = ['A', 'B', 'C', 'D', 'E'];
+const SUBJECTS = ['数学', '语文', '英语', '物理', '化学', '道法', '历史', '生物', '地理'];
+
+function allKps(subject, outline) {
+  const ch = outline[subject] || {};
+  const arr = [];
+  for (const c in ch) for (const kp of ch[c]) arr.push(kp);
+  return arr;
+}
+
+// 触发刷题：可带单个考点或一组错题（用于"错题重练"）
+export function startQuiz({ subject, knowledgePoint, retryQueue }) {
+  if (retryQueue && retryQueue.length) {
+    window.__retryQueue = retryQueue; // [{subject, knowledgePoint, question, answer, options, explanation}]
+    window.__pendingQuiz = null;
+    window.dispatchEvent(new CustomEvent('start-retry'));
+  } else {
+    window.__pendingQuiz = { subject, knowledgePoint };
+    window.__retryQueue = null;
+    window.dispatchEvent(new CustomEvent('goto-quiz', { detail: { subject, knowledgePoint } }));
+  }
+  window.dispatchEvent(new CustomEvent('goto-tab', { detail: 'quiz' }));
+}
 
 export default function QuizPanel() {
-  // 初始考点：优先取知识页"去刷题"带过来的 pending，否则给个默认入口
-  const pending = typeof window !== 'undefined' && window.__pendingQuiz;
-  const [outline, setOutline] = useState(null);
-  const [subjects, setSubjects] = useState([]);
-  const [sub, setSub] = useState(pending?.subject || '数学');
-  const [kp, setKp] = useState(pending?.knowledgePoint || '二次函数概念与图象');
+  const [subject, setSubject] = useState('数学');
+  const [kp, setKp] = useState('');
   const [q, setQ] = useState(null);
-  const [diff, setDiff] = useState(2);
-  const [sel, setSel] = useState('');
-  const [feedback, setFeedback] = useState(null); // {correct, text}
-  const [submitting, setSubmitting] = useState(false);
+  const [sel, setSel] = useState(null);
+  const [feedback, setFeedback] = useState(null); // {correct, gained, correctAnswer}
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [retry, setRetry] = useState(null); // {queue, index} 错题重练状态
+  const [favorited, setFavorited] = useState(false);
+  const [msg, setMsg] = useState(''); // 轻提示（收藏等）
+  const [outline, setOutline] = useState({}); // {科目:{章节:[考点]}}
+  const [candidates, setCandidates] = useState([]); // 输入时联想候选
+  const [showCand, setShowCand] = useState(false);
+  const started = useRef(false);
 
-  // 加载大纲，用于科目/知识点选择器
+  // 加载大纲，用于考点自动补全
+  useEffect(() => { api.getTree().then((d) => setOutline(d.outline || {})).catch(() => {}); }, []);
+
+  // 接收外部发起的刷题（知识地图/错题本/首页跳转）
   useEffect(() => {
-    api.getOutline().then((d) => {
-      setOutline(d.outline);
-      setSubjects(Object.keys(d.outline));
-    }).catch(() => {});
+    const onPending = (e) => {
+      const d = e.detail || window.__pendingQuiz;
+      if (d && d.knowledgePoint) {
+        setSubject(d.subject || '数学');
+        setKp(d.knowledgePoint);
+        loadQuestion(d.subject || '数学', d.knowledgePoint);
+      }
+      window.__pendingQuiz = null;
+    };
+    const onRetry = () => {
+      const queue = window.__retryQueue;
+      if (queue && queue.length) {
+        setRetry({ queue, index: 0 });
+        loadRetry(0, queue);
+      }
+      window.__retryQueue = null;
+    };
+    window.addEventListener('goto-quiz', onPending);
+    window.addEventListener('start-retry', onRetry);
+    return () => { window.removeEventListener('goto-quiz', onPending); window.removeEventListener('start-retry', onRetry); };
   }, []);
 
-  const points = outline ? Object.values(outline[sub] || {}).flat() : [];
-
-  const next = async () => {
-    setFeedback(null);
-    setSel('');
-    try {
-      const r = await api.quizNext({ subject: sub, knowledgePoint: kp, difficulty: diff });
-      setQ(r);
-    } catch (e) {
-      setFeedback({ correct: false, text: '加载题目失败：' + e.message });
-    }
-  };
-  // 科目或知识点变化即拉题（sub/kp 已含跳转带来的最新值，无竞态）
-  useEffect(() => { next(); }, [sub, kp]); // eslint-disable-line
-  // 从知识页一键过来刷这个考点：自动切科目/知识点并开始
-  useEffect(() => {
-    const onGoto = (e) => {
-      if (e.detail?.knowledgePoint) { setSub(e.detail.subject || sub); setKp(e.detail.knowledgePoint); }
-    };
-    window.addEventListener('goto-quiz', onGoto);
-    if (window.__pendingQuiz) { setSub(window.__pendingQuiz.subject || sub); setKp(window.__pendingQuiz.knowledgePoint); window.__pendingQuiz = null; }
-    return () => window.removeEventListener('goto-quiz', onGoto);
-  }, []); // eslint-disable-line
-
-  const answer = async () => {
-    if (!q || submitting) return;
-    setSubmitting(true);
-    const correct = sel === q.answer;
-    try {
-      await api.quizAnswer({
-        subject: sub, knowledgePoint: kp, correct, difficulty: diff,
-        question: q.question, answer: q.answer,
-        options: q.options, explanation: q.explanation
-      });
-      setFeedback({ correct, text: correct ? '答对啦！+10分 🎉' : q.explanation });
-    } catch (e) {
-      setFeedback({ correct: false, text: '提交失败：' + e.message });
-    } finally {
-      setSubmitting(false);
-    }
-    setDiff((d) => (correct ? Math.min(5, d + 1) : Math.max(1, d - 1)));
+  const loadQuestion = (subj, kpoint) => {
+    setBusy(true); setErr(''); setSel(null); setFeedback(null); setFavorited(false);
+    api.quizNext({ subject: subj, knowledgePoint: kpoint }).then((data) => {
+      if (data && data.question) { setQ(data); started.current = true; }
+      else { setQ(null); setErr('这个考点暂时没有题目，换个考点试试～'); }
+    }).catch((e) => setErr('出题失败：' + e.message)).finally(() => setBusy(false));
   };
 
-  if (!q) return <p>加载中…</p>;
-  // 该考点无本地题且无 AI：给出明确提示，不再回退到无关学科演示题
-  if (q.noLocalQuestion) {
-    return (
-      <div>
-        <h2>智能刷题</h2>
-        <p className="quiz-kp">当前考点：<b>{kp}</b></p>
-        <div className="quiz-feedback no">
-          <p>📚 {q.note || '该考点暂未录入本地题库。'}</p>
-          <p>建议：先点顶部「总结卡」复习该考点；或在电脑上配置 <code>DEEPSEEK_API_KEY</code> 后由 AI 即时出题。</p>
-          <button onClick={() => { setKp(Object.values(outline?.[sub] || {})[0]?.[0] || ''); }}>换一个已录入的考点</button>
-        </div>
-      </div>
-    );
-  }
+  const loadRetry = (index, queue) => {
+    const item = queue[index];
+    if (!item) { setQ(null); setRetry(null); setErr(''); setMsg('🎉 错题重练完成！'); return; }
+    setSubject(item.subject); setKp(item.knowledgePoint);
+    setBusy(true); setErr(''); setSel(null); setFeedback(null); setFavorited(false);
+    api.quizNext({ subject: item.subject, knowledgePoint: item.knowledgePoint }).then((data) => {
+      if (data && data.question) { setQ(data); started.current = true; }
+      else {
+        // 该考点抽不到题则跳过，直接进下一题
+        const next = index + 1;
+        setRetry({ queue, index: next });
+        loadRetry(next, queue);
+      }
+    }).catch(() => { const next = index + 1; setRetry({ queue, index: next }); loadRetry(next, queue); }).finally(() => setBusy(false));
+  };
+
+  const submit = () => {
+    if (sel == null || !q) return;
+    setBusy(true);
+    api.submitAnswer({
+      subject, knowledgePoint: kp, correct: sel === q.answer, question: q.question, answer: q.answer, options: q.options,
+    }).then((res) => {
+      setFeedback({ correct: sel === q.answer, gained: res.points || 0, correctAnswer: q.answer });
+      setBusy(false);
+      // 错题重练模式：自动进入下一题（延迟 900ms 让学生看清对错）
+      if (retry) {
+        setTimeout(() => {
+          const next = retry.index + 1;
+          setRetry({ queue: retry.queue, index: next });
+          loadRetry(next, retry.queue);
+        }, 900);
+      }
+    }).catch((e) => { setErr('提交失败：' + e.message); setBusy(false); });
+  };
+
+  const next = () => {
+    setSel(null); setFeedback(null); setFavorited(false);
+    if (retry) {
+      const next = retry.index + 1;
+      setRetry({ queue: retry.queue, index: next });
+      loadRetry(next, retry.queue);
+    } else {
+      loadQuestion(subject, kp);
+    }
+  };
+
+  const onToggleFav = () => {
+    if (!q) return;
+    api.toggleFavorite({
+      subject, knowledgePoint: kp, question: q.question, answer: q.answer, options: q.options, explanation: q.explanation,
+    }).then((r) => { setFavorited(r.favorited); setMsg(r.favorited ? '⭐ 已收藏这道难题' : '已取消收藏'); setTimeout(() => setMsg(''), 1500); })
+      .catch(() => setMsg('收藏失败'));
+  };
+
+  // 把当前题甩给阿杰学长讲解
+  const askCoach = () => {
+    if (!q) return;
+    window.__pendingChatQuestion = { subject, knowledgePoint: kp, question: q.question, answer: q.answer, options: q.options, explanation: q.explanation };
+    window.dispatchEvent(new CustomEvent('goto-tab', { detail: 'chat' }));
+  };
+
   return (
-    <div>
-      <h2>智能刷题</h2>
-      <div className="quiz-selectors">
-        <label>科目
-          <select value={sub} onChange={(e) => { setSub(e.target.value); setKp(Object.values(outline?.[e.target.value] || {})[0]?.[0] || ''); }}>
-            {subjects.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
-        </label>
-        <label>知识点
-          <select value={kp} onChange={(e) => setKp(e.target.value)}>
-            {points.map((p) => <option key={p} value={p}>{p}</option>)}
-          </select>
-        </label>
+    <div className="quiz">
+      <h2>刷题</h2>
+      {retry && <p className="quiz-retry-tag">🔁 错题重练中：第 {retry.index + 1} / {retry.queue.length} 题</p>}
+      <div className="quiz-controls">
+        <select value={subject} onChange={(e) => { setSubject(e.target.value); setKp(''); setCandidates([]); setShowCand(false); setQ(null); setErr(''); }}>
+          {SUBJECTS.map((s) => <option key={s}>{s}</option>)}
+        </select>
+        <div className="quiz-kp-wrap">
+          <input
+            placeholder="输入考点关键词，如 二次函数"
+            value={kp}
+            onChange={(e) => {
+              const v = e.target.value;
+              setKp(v);
+              const all = allKps(subject, outline);
+              const hits = v ? all.filter((k) => k.toLowerCase().includes(v.toLowerCase())) : [];
+              setCandidates(hits.slice(0, 8));
+              setShowCand(v.length > 0);
+            }}
+            onFocus={() => { if (kp.length) setShowCand(true); }}
+            onBlur={() => setTimeout(() => setShowCand(false), 180)}
+          />
+          {showCand && candidates.length > 0 && (
+            <ul className="quiz-candidates">
+              {candidates.map((k) => (
+                <li key={k} onMouseDown={() => { setKp(k); setShowCand(false); setRetry(null); window.__retryQueue = null; loadQuestion(subject, k); }}>
+                  {k}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <button onClick={() => { setRetry(null); window.__retryQueue = null; loadQuestion(subject, kp); }} disabled={busy}>出题</button>
       </div>
-      <p className="quiz-kp">当前考点：<b>{kp}</b> · 难度 {diff} · 做对就把它变绿 🟢（对应知识地图里的红圈）</p>
-      <div className="quiz-actions">
-        <button className="quiz-summary" onClick={() => {
-          window.__pendingSummary = { subject: sub, knowledgePoint: kp };
-          window.dispatchEvent(new CustomEvent('goto-tab', { detail: 'knowledge' }));
-        }}>📖 看这个考点的总结卡</button>
-      </div>
-      <p>{q.question}{q.note && <span className="note">（{q.note}）</span>}</p>
-      <div className="quiz-options">
-        {(q.options || []).map((opt, i) => {
-          const letter = LETTERS[i];
-          const isCorrect = !feedback?.correct && letter === q.answer;
-          const isChosen = letter === sel;
-          const cls = 'quiz-option' + (isCorrect ? ' opt-correct' : isChosen ? ' sel' : '');
-          return (
-            <button key={i} onClick={() => setSel(letter)} disabled={!!feedback} className={cls}>
-              {opt}
-            </button>
-          );
-        })}
-      </div>
-      {!feedback ? (
-        <button onClick={answer} disabled={!sel || submitting}>提交</button>
-      ) : (
-        <div className={feedback.correct ? 'quiz-feedback ok' : 'quiz-feedback no'}>
-          <p>{feedback.text}</p>
-          <button onClick={next}>下一题</button>
+
+      {!q && showCand && candidates.length === 0 && kp.length > 0 && (
+        <p className="quiz-err">没有找到含「{kp}」的考点，换个关键词试试～</p>
+      )}
+
+      {busy && <p>阿杰学长正在出题…</p>}
+      {err && <p className="quiz-err">{err}</p>}
+      {msg && <p className="quiz-msg">{msg}</p>}
+
+      {q && (
+        <div className="quiz-card">
+          <div className="quiz-meta">
+            <span className="quiz-subject">{q.subject}</span>
+            <span className="quiz-kp">{q.knowledgePoint}</span>
+          </div>
+          <p className="quiz-q">{q.question}</p>
+          {q.options && q.options.length > 0 ? (
+            <div className="quiz-options">
+              {q.options.map((opt, i) => {
+                const letter = String.fromCharCode(65 + i);
+                let cls = 'quiz-option';
+                if (feedback) {
+                  if (letter === q.answer) cls += ' opt-correct';      // 正确答案：绿
+                  if (letter === sel && sel !== q.answer) cls += ' opt-wrong'; // 你选错的：红
+                } else if (letter === sel) cls += ' opt-selected';
+                return (
+                  <button key={i} className={cls} disabled={!!feedback} onClick={() => setSel(letter)}>
+                    <span className="opt-letter">{letter}</span>
+                    <span className="opt-text">{opt}</span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="quiz-options">
+              {['A', 'B', 'C', 'D'].map((letter) => {
+                let cls = 'quiz-option';
+                if (feedback) {
+                  if (letter === q.answer) cls += ' opt-correct';
+                  if (letter === sel && sel !== q.answer) cls += ' opt-wrong';
+                } else if (letter === sel) cls += ' opt-selected';
+                return (
+                  <button key={letter} className={cls} disabled={!!feedback} onClick={() => setSel(letter)}>
+                    <span className="opt-letter">{letter}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {q.note && <p className="quiz-note">💡 提示：{q.note}</p>}
+
+          {!feedback ? (
+            <div className="quiz-actions">
+              <button className="quiz-submit" onClick={submit} disabled={sel == null}>提交</button>
+              <button className="quiz-fav" onClick={onToggleFav}>{favorited ? '⭐ 已收藏' : '☆ 收藏难题'}</button>
+              <button className="quiz-ask" onClick={askCoach}>问学长讲讲</button>
+            </div>
+          ) : (
+            <div className="quiz-feedback">
+              <p className={feedback.correct ? 'ok' : 'no'}>{feedback.correct ? `✅ 答对啦！+${feedback.gained} 积分` : `❌ 答错了，正确答案是 ${feedback.correctAnswer}`}</p>
+              {!feedback.correct && q.explanation && <p className="quiz-explain">解析：{q.explanation}</p>}
+              <div className="quiz-actions">
+                <button className="quiz-next" onClick={next}>{retry ? '下一题 →' : '下一题'}</button>
+                <button className="quiz-fav" onClick={onToggleFav}>{favorited ? '⭐ 已收藏' : '☆ 收藏难题'}</button>
+                <button className="quiz-ask" onClick={askCoach}>问学长讲讲</button>
+                <button className="quiz-summary" onClick={() => {
+                  window.__pendingSummary = { subject, knowledgePoint: kp };
+                  window.dispatchEvent(new CustomEvent('goto-tab', { detail: 'knowledge' }));
+                }}>看这个考点的总结卡</button>
+              </div>
+            </div>
+          )}
         </div>
       )}
-      {feedback && !feedback.correct && (
-        <Companion message={q.explanation || '再想想这个考点～'} />
+
+      {!q && !busy && !err && !msg && (
+        <p className="quiz-empty">选好科目和考点，点「出题」开始吧 👆 做错的题会自动进错题本，也可以从错题本一键「错题重练」。</p>
       )}
     </div>
   );

@@ -1,7 +1,7 @@
 import express from 'express';
 import { explainQuestion, generateQuiz, usingMock } from './ai.js';
 import { addPoints, getBadges } from './gamify.js';
-import { addMistake, getMistakes, getWeakness, resetUser } from './mistakes.js';
+import { addMistake, getMistakes, getWeakness, resetUser, toggleFavorite, getFavorites } from './mistakes.js';
 import { getOutline, computeMastery, getMastery, mergeMastery, summarize } from './knowledge.js';
 import { db, ensureUser } from './db.js';
 
@@ -45,12 +45,41 @@ app.post('/api/quiz/answer', async (req, res) => {
 
 app.get('/api/progress', async (req, res) => {
   const u = db.prepare('SELECT points,level,streak FROM users WHERE id=?').get(SELF_ID);
-  const weakness = await getWeakness(SELF_ID);
+  const weakness = await getWeakness(SELF_ID); // {redLight:[kp], greenLight:[kp]}
   const badges = getBadges(SELF_ID);
-  res.json({ ...u, weakness, badges });
+  // 累计答对 & 各考点正确率（供首页显示薄弱比例）
+  const recs = db.prepare('SELECT knowledge_point, correct FROM quiz_records WHERE user_id=?').all(SELF_ID);
+  let totalCorrect = 0;
+  const rateMap = {};
+  for (const r of recs) { if (r.correct) totalCorrect++; const k = r.knowledge_point; if (!rateMap[k]) rateMap[k] = { t: 0, c: 0 }; rateMap[k].t++; if (r.correct) rateMap[k].c++; }
+  const weaknessList = (weakness.redLight || []).map((kp) => ({ knowledgePoint: kp, correctRate: rateMap[kp] ? rateMap[kp].c / rateMap[kp].t : 0 }));
+  const masteredList = (weakness.greenLight || []).map((kp) => ({ knowledgePoint: kp }));
+  // 已掌握考点数 = 点亮（mastery>=60）的数量
+  const mastery = computeMastery(SELF_ID);
+  const litCount = Object.values(mastery).filter((v) => v >= 60).length;
+  // 近 7 天打卡标记（checkins.day 存打卡日期 TEXT，如 2026-08-15）
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const checkinRows = db.prepare('SELECT day FROM checkins WHERE user_id=?').all(SELF_ID).map((x) => x.day);
+  const days = [];
+  for (let i = 6; i >= 0; i--) { const d = new Date(today); d.setDate(d.getDate() - i); const key = d.toISOString().slice(0, 10); days.push(checkinRows.includes(key)); }
+  res.json({
+    points: u.points, level: u.level, streak: u.streak || 0, total: litCount, totalCorrect,
+    last7: days, badges,
+    stats: { weakness: weaknessList, mastered: masteredList },
+  });
 });
 
 app.get('/api/mistakes', (req, res) => res.json(getMistakes(SELF_ID)));
+app.post('/api/favorites', (req, res) => {
+  try {
+    const r = toggleFavorite(SELF_ID, {
+      subject: req.body.subject, knowledgePoint: req.body.knowledgePoint, question: req.body.question,
+      answer: req.body.answer, options: req.body.options, explanation: req.body.explanation,
+    });
+    res.json(r);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.get('/api/favorites', (req, res) => res.json(getFavorites(SELF_ID)));
 
 // 重置：清空当前用户全部使用数据，回到初始阶段（保留账号）
 app.post('/api/reset', (req, res) => {

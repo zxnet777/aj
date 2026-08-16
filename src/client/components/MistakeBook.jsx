@@ -1,44 +1,69 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { api } from '../api.js';
+import { startQuiz } from './QuizPanel.jsx';
 
 export default function MistakeBook() {
   const [list, setList] = useState([]);
-  const load = () => api.getMistakes().then(setList).catch(() => {});
+  const [subjectFilter, setSubjectFilter] = useState('全部');
+  const [timeFilter, setTimeFilter] = useState('全部');
+  const [subjects, setSubjects] = useState([]);
+  const load = () => api.getMistakes().then((d) => {
+    setList(d);
+    setSubjects(['全部', ...Array.from(new Set(d.map((m) => m.subject)))]);
+  }).catch(() => {});
   useEffect(() => {
     load();
-    // 重置后重新拉取，确保错题本清空
     const onReset = () => load();
     window.addEventListener('data-reset', onReset);
     return () => window.removeEventListener('data-reset', onReset);
   }, []);
-  const parse = (v) => { try { return JSON.parse(v); } catch { return null; } };
+
+  const retryOne = (m) => startQuiz({ subject: m.subject, knowledgePoint: m.knowledge_point });
+
+  const retryAll = () => {
+    if (!list.length) return;
+    startQuiz({ retryQueue: list.map((m) => ({
+      subject: m.subject, knowledgePoint: m.knowledge_point, question: m.question, answer: m.answer,
+    })) });
+  };
+
+  const now = Date.now();
+  const filtered = list.filter((m) => {
+    if (subjectFilter !== '全部' && m.subject !== subjectFilter) return false;
+    if (timeFilter === '一周内') return now - new Date(m.created_at).getTime() <= 7 * 864e5;
+    if (timeFilter === '一月内') return now - new Date(m.created_at).getTime() <= 30 * 864e5;
+    return true;
+  });
+
   return (
-    <div>
+    <div className="mistakes">
       <h2>错题本</h2>
-      {list.length === 0 && <p className="muted">还没有错题，继续刷题把它们消灭吧！</p>}
-      {list.map((m) => {
-        const options = parse(m.options);
-        return (
-          <div key={m.id} className="mistake">
-            <b>{m.subject} · {m.knowledge_point}</b>
-            <p className="mistake-q">{m.question}</p>
-            {Array.isArray(options) && options.length > 0 && (
-              <ul className="mistake-options">
-                {options.map((o, i) => (
-                  <li key={i} className={o.startsWith(m.answer) ? 'correct' : ''}>{o}</li>
-                ))}
-              </ul>
-            )}
-            <p>你的答案：<b>{m.answer}</b></p>
-            {m.explanation && (
-              <details className="mistake-explain">
-                <summary>看解析</summary>
-                <p>{m.explanation}</p>
-              </details>
-            )}
-          </div>
-        );
-      })}
+      <div className="mb-filters">
+        <select value={subjectFilter} onChange={(e) => setSubjectFilter(e.target.value)}>
+          {subjects.map((s) => <option key={s}>{s}</option>)}
+        </select>
+        <select value={timeFilter} onChange={(e) => setTimeFilter(e.target.value)}>
+          {['全部', '一周内', '一月内'].map((t) => <option key={t}>{t}</option>)}
+        </select>
+        <button className="mb-retry-all" onClick={retryAll} disabled={!list.length}>🔁 错题重练（{list.length}）</button>
+      </div>
+
+      {filtered.length === 0 && <p className="mb-empty">暂无错题，保持住 💪</p>}
+
+      <ul className="mb-list">
+        {filtered.map((m, i) => (
+          <li key={m.id || i} className="mb-item" onClick={() => retryOne(m)} title="点击直接重刷这个考点">
+            <div className="mb-meta">
+              <span className="mb-subject">{m.subject}</span>
+              <span className="mb-kp">{m.knowledge_point}</span>
+              <span className="mb-time">{m.created_at ? m.created_at.slice(0, 10) : ''}</span>
+            </div>
+            <p className="mb-q">{m.question}</p>
+            <p className="mb-ans">你的答案：<b className="mb-mine">{m.answer}</b> ｜ 正确答案：<b>{m.correct_answer}</b></p>
+            <button className="mb-go" onClick={(e) => { e.stopPropagation(); retryOne(m); }}>→ 重刷</button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

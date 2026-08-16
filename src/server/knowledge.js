@@ -823,7 +823,7 @@ export async function summarize(userId, { subject, chapter, knowledgePoint }) {
   const prev = prevRow?.mastery;
   const firstTime = prev === undefined;
   let next;
-  if (firstTime) next = Math.max(prev ?? 0, 20);
+  if (firstTime) next = Math.max(prev ?? 0, 30); // 首次看总结给"已入门"黄灯，避免全红
   else next = prev >= 60 ? prev : Math.min(REVIEW_CAP, (prev ?? 0) + 12); // 已变绿的保持，未绿的复习最多到黄
   const reviewCount = (prevRow?.reviews ?? 0) + 1; // 每次梳理计一次复习
   setMastery(userId, subject, chapter, knowledgePoint, next, reviewCount);

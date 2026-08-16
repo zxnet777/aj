@@ -10,6 +10,15 @@ function findChapter(outline, kp) {
   return null;
 }
 
+// 把大纲拍平成有序列表，方便在卡片上做"上一考点/下一考点"导航
+function flatKps(outline) {
+  const arr = [];
+  for (const subject in outline) for (const chapter in outline[subject]) {
+    for (const kp of outline[subject][chapter]) arr.push({ subject, chapter, kp });
+  }
+  return arr;
+}
+
 // 掌握度 -> 红绿灯颜色
 function light(m) {
   if (!m) return '⚪';
@@ -219,6 +228,21 @@ export default function KnowledgeMap() {
               <h3>{card.subject} · {card.kp} <span className="km-light">{light(card.mastery)} {card.mastery}%</span></h3>
               <p className="km-chapter-label">对应课本：{card.chapter}</p>
               <p className="km-review">已复习 {card.reviewCount || 1} 次{card.reviewCount > 1 ? '（红圈越复习越容易变黄/绿）' : ''}</p>
+              <div className="km-nav">
+                {(() => {
+                  const flat = flatKps(outline);
+                  const idx = flat.findIndex((x) => x.subject === card.subject && x.kp === card.kp);
+                  const prev = idx > 0 ? flat[idx - 1] : null;
+                  const nxt = idx >= 0 && idx < flat.length - 1 ? flat[idx + 1] : null;
+                  return (
+                    <>
+                      <button className="km-prev" disabled={!prev} onClick={() => prev && summarize(prev.subject, prev.chapter, prev.kp)}>← 上一考点</button>
+                      <span className="km-nav-pos">{idx + 1} / {flat.length}</span>
+                      <button className="km-next" disabled={!nxt} onClick={() => nxt && summarize(nxt.subject, nxt.chapter, nxt.kp)}>下一考点 →</button>
+                    </>
+                  );
+                })()}
+              </div>
               <div className="km-actions">
                 <button className="km-quiz" onClick={() => {
                   const detail = { subject: card.subject, knowledgePoint: card.kp };
