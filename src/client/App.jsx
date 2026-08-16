@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { api } from './api.js';
 import Dashboard from './components/Dashboard.jsx';
 import ChatPanel from './components/ChatPanel.jsx';
@@ -9,9 +9,12 @@ import GameBar from './components/GameBar.jsx';
 export default function App() {
   const [user, setUser] = useState(localStorage.getItem('token') ? true : false);
   const [tab, setTab] = useState('home');
+  const [mock, setMock] = useState(false);
+  useEffect(() => { api.getMeta().then((m) => setMock(m.mock)).catch(() => {}); }, []);
   if (!user) return <Login onOk={() => setUser(true)} />;
   return (
     <div className="app">
+      {mock && <div className="banner">演示模式：未配置 DeepSeek Key，AI 内容为示例数据，配置后即可真人讲解</div>}
       <GameBar />
       <nav>
         {['home', 'chat', 'quiz', 'mistakes'].map((t) => (

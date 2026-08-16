@@ -1,5 +1,8 @@
 import { DatabaseSync } from 'node:sqlite';
-export const db = new DatabaseSync('app.db');
+const IS_TEST = process.env.NODE_ENV === 'test' || (process.argv[1] && process.argv[1].includes('node:test'));
+const DB_FILE = IS_TEST ? ':memory:' : 'app.db';
+export const db = new DatabaseSync(DB_FILE);
+if (DB_FILE !== ':memory:') db.exec('PRAGMA journal_mode=WAL');
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

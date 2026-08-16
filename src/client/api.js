@@ -15,5 +15,6 @@ export const api = {
   quizNext: (b) => req('/quiz/next', { method: 'POST', body: JSON.stringify(b) }),
   quizAnswer: (b) => req('/quiz/answer', { method: 'POST', body: JSON.stringify(b) }),
   getProgress: () => req('/progress'),
-  getMistakes: () => req('/mistakes')
+  getMistakes: () => req('/mistakes'),
+  getMeta: () => req('/meta')
 };

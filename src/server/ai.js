@@ -9,55 +9,89 @@ function getClient() {
   }
   return client;
 }
+const HAS_KEY = !!process.env.DEEPSEEK_API_KEY;
+export const usingMock = !HAS_KEY;
+
 const SYSTEM = `你是"阿杰学长"，一个初三学生的 AI 学霸同桌。语气亲切像朋友，永远先鼓励再指正。
 讲解题目用引导式：先问思路，再点破关键，最后总结方法。绝不直接把答案硬灌。
 每次回复 JSON：{"reply":"讲解内容","encouragement":"一句鼓励"}。`;
 
+// 无 API Key 或调用失败时的演示数据，保证未配置 Key 也能走通全流程
+const MOCK = {
+  explain: {
+    reply: '同学你好！这道题我们先想想：题目要我们求什么？已知条件和目标之间差哪一步？\n\n比如这类题通常先找"等量关系"，再代入。你先试着列一下式子，卡住的地方告诉我，我陪你一步步推～',
+    encouragement: '敢问就赢了一半，这题思路其实很顺，跟着我走一遍就通了！'
+  },
+  quiz: {
+    question: '（演示题）二次函数 y = x² - 2x - 3 的顶点坐标是？',
+    options: ['A. (1, -4)', 'B. (-1, -4)', 'C. (1, 4)', 'D. (-1, 4)'],
+    answer: 'A',
+    explanation: '配方：y=(x-1)²-4，顶点为 (1,-4)。选 A 正确！',
+    difficulty: 2
+  },
+  weakness: { redLight: ['二次函数', '阅读理解'], greenLight: ['一元一次方程'] }
+};
+
+async function callWithFallback(realCall, mock) {
+  if (!HAS_KEY) return mock;
+  try { return await realCall(); }
+  catch (e) {
+    console.warn('[ai] DeepSeek 调用失败，回退演示数据：', e.message);
+    return mock;
+  }
+}
+
 export async function explainQuestion({ subject, question, history = [] }) {
-  const msgs = [
-    { role: 'system', content: SYSTEM },
-    ...history,
-    { role: 'user', content: `科目:${subject}\n题目:${question}` }
-  ];
-  const r = await getClient().chat.completions.create({
-    model: 'deepseek-chat',
-    messages: msgs,
-    response_format: { type: 'json_object' }
-  });
-  return JSON.parse(r.choices[0].message.content);
+  return callWithFallback(async () => {
+    const msgs = [
+      { role: 'system', content: SYSTEM },
+      ...history,
+      { role: 'user', content: `科目:${subject}\n题目:${question}` }
+    ];
+    const r = await getClient().chat.completions.create({
+      model: 'deepseek-chat',
+      messages: msgs,
+      response_format: { type: 'json_object' }
+    });
+    return JSON.parse(r.choices[0].message.content);
+  }, MOCK.explain);
 }
 
 export async function generateQuiz({ subject, knowledgePoint, difficulty = 2 }) {
-  const msgs = [
-    {
-      role: 'system',
-      content: SYSTEM + ' 出题请返回 JSON:{"question","options":["A..","B.."],"answer":"A","explanation","difficulty"}'
-    },
-    {
-      role: 'user',
-      content: `科目:${subject} 考点:${knowledgePoint} 难度:${difficulty}/5，出一道选择题`
-    }
-  ];
-  const r = await getClient().chat.completions.create({
-    model: 'deepseek-chat',
-    messages: msgs,
-    response_format: { type: 'json_object' }
-  });
-  return JSON.parse(r.choices[0].message.content);
+  return callWithFallback(async () => {
+    const msgs = [
+      {
+        role: 'system',
+        content: SYSTEM + ' 出题请返回 JSON:{"question","options":["A..","B.."],"answer":"A","explanation","difficulty"}'
+      },
+      {
+        role: 'user',
+        content: `科目:${subject} 考点:${knowledgePoint} 难度:${difficulty}/5，出一道选择题`
+      }
+    ];
+    const r = await getClient().chat.completions.create({
+      model: 'deepseek-chat',
+      messages: msgs,
+      response_format: { type: 'json_object' }
+    });
+    return JSON.parse(r.choices[0].message.content);
+  }, MOCK.quiz);
 }
 
 export async function analyzeWeakness(records) {
-  const msgs = [
-    {
-      role: 'system',
-      content: SYSTEM + ' 根据做题记录返回 JSON:{"redLight":["薄弱考点"],"greenLight":["掌握考点"]}'
-    },
-    { role: 'user', content: '记录:' + JSON.stringify(records) }
-  ];
-  const r = await getClient().chat.completions.create({
-    model: 'deepseek-chat',
-    messages: msgs,
-    response_format: { type: 'json_object' }
-  });
-  return JSON.parse(r.choices[0].message.content);
+  return callWithFallback(async () => {
+    const msgs = [
+      {
+        role: 'system',
+        content: SYSTEM + ' 根据做题记录返回 JSON:{"redLight":["薄弱考点"],"greenLight":["掌握考点"]}'
+      },
+      { role: 'user', content: '记录:' + JSON.stringify(records) }
+    ];
+    const r = await getClient().chat.completions.create({
+      model: 'deepseek-chat',
+      messages: msgs,
+      response_format: { type: 'json_object' }
+    });
+    return JSON.parse(r.choices[0].message.content);
+  }, MOCK.weakness);
 }

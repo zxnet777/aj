@@ -1,6 +1,6 @@
 import express from 'express';
 import { router as authRouter, authMiddleware } from './routes/auth.js';
-import { explainQuestion, generateQuiz } from './ai.js';
+import { explainQuestion, generateQuiz, usingMock } from './ai.js';
 import { addPoints } from './gamify.js';
 import { addMistake, getMistakes, getWeakness } from './mistakes.js';
 import { db } from './db.js';
@@ -8,6 +8,8 @@ import { db } from './db.js';
 const app = express();
 app.use(express.json());
 app.use('/api', authRouter);
+
+app.get('/api/meta', (req, res) => res.json({ mock: usingMock }));
 
 app.post('/api/chat', authMiddleware, async (req, res) => {
   try {

@@ -7,6 +7,7 @@ nav button { padding: 8px 12px; border: none; border-radius: 10px; background: #
 .login button { padding: 10px; border: none; border-radius: 10px; background: #4f7cff; color: #fff }
 .err { color: #e23 }
 .gamebar { padding: 8px 12px; background: #fff; border-radius: 10px; font-weight: 600 }
+.banner { background: #fff7e0; color: #8a6d00; padding: 8px 12px; border-radius: 10px; margin-bottom: 8px; font-size: 13px }
 .companion { display: flex; gap: 8px; align-items: center; margin: 10px 0 }
 .companion .avatar { background: #4f7cff; color: #fff; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; font-size: 12px }
 .companion .bubble { background: #fff; padding: 8px 12px; border-radius: 12px }
