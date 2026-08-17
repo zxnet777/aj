@@ -45,10 +45,19 @@ export default function QuizPanel() {
   // 加载大纲，用于考点自动补全
   useEffect(() => { api.getTree().then((d) => setOutline(d.outline || {})).catch(() => {}); }, []);
 
-  // 首次进入刷题页：直接出题（默认取大纲第一个科目的第一个考点），无需用户手动输入
+  // 首次进入刷题页：直接出题。若从知识地图“去刷这一题”带过来了指定考点，优先刷那个；否则取大纲第一个科目的第一个考点。
   useEffect(() => {
     if (autoTried.current) return;
     autoTried.current = true;
+    const pending = window.__pendingQuiz;
+    if (pending && pending.knowledgePoint) {
+      const subj = pending.subject || Object.keys(outline)[0];
+      setSubject(subj);
+      setKp(pending.knowledgePoint);
+      loadQuestion(subj, pending.knowledgePoint);
+      window.__pendingQuiz = null;
+      return;
+    }
     const firstSubject = Object.keys(outline)[0];
     if (!firstSubject) { setErr('题库为空，先去知识地图看看～'); return; }
     if (subject !== firstSubject) setSubject(firstSubject);
