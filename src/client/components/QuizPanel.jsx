@@ -39,9 +39,20 @@ export default function QuizPanel() {
   const [candidates, setCandidates] = useState([]); // 输入时联想候选
   const [showCand, setShowCand] = useState(false);
   const started = useRef(false);
+  const autoTried = useRef(false); // 防止重复自动出题
 
   // 加载大纲，用于考点自动补全
   useEffect(() => { api.getTree().then((d) => setOutline(d.outline || {})).catch(() => {}); }, []);
+
+  // 首次进入刷题页：直接出题（默认取该科目的一个考点），无需用户手动输入
+  useEffect(() => {
+    if (autoTried.current) return;
+    autoTried.current = true;
+    const all = allKps(subject, outline);
+    const kpoint = all.length ? all[0] : '';
+    if (kpoint) loadQuestion(subject, kpoint);
+    else setErr('题库为空，先去知识地图看看～');
+  }, [outline]); // eslint-disable-line
 
   // 接收外部发起的刷题（知识地图/错题本/首页跳转）
   useEffect(() => {
@@ -141,12 +152,20 @@ export default function QuizPanel() {
       <h2>刷题</h2>
       {retry && <p className="quiz-retry-tag">🔁 错题重练中：第 {retry.index + 1} / {retry.queue.length} 题</p>}
       <div className="quiz-controls">
-        <select value={subject} onChange={(e) => { setSubject(e.target.value); setKp(''); setCandidates([]); setShowCand(false); setQ(null); setErr(''); }}>
+        <select value={subject} onChange={(e) => {
+          const s = e.target.value;
+          setSubject(s);
+          setKp(''); setCandidates([]); setShowCand(false); setRetry(null); window.__retryQueue = null;
+          // 切换科目后直接进入该科目第一个考点出题，无需手动操作
+          const all = allKps(s, outline);
+          if (all.length) loadQuestion(s, all[0]);
+          else { setQ(null); setErr('该科目题库为空，先去知识地图看看～'); }
+        }}>
           {SUBJECTS.map((s) => <option key={s}>{s}</option>)}
         </select>
         <div className="quiz-kp-wrap">
           <input
-            placeholder="输入考点关键词，如 二次函数"
+            placeholder="想指定考点？输入关键词，如 二次函数"
             value={kp}
             onChange={(e) => {
               const v = e.target.value;
@@ -169,7 +188,7 @@ export default function QuizPanel() {
             </ul>
           )}
         </div>
-        <button onClick={() => { setRetry(null); window.__retryQueue = null; loadQuestion(subject, kp); }} disabled={busy}>出题</button>
+        <button onClick={() => { setRetry(null); window.__retryQueue = null; if (kp) loadQuestion(subject, kp); else { const all = allKps(subject, outline); if (all.length) loadQuestion(subject, all[0]); else setErr('该科目题库为空'); } }} disabled={busy}>换一题</button>
       </div>
 
       {!q && showCand && candidates.length === 0 && kp.length > 0 && (
@@ -248,7 +267,7 @@ export default function QuizPanel() {
       )}
 
       {!q && !busy && !err && !msg && (
-        <p className="quiz-empty">选好科目和考点，点「出题」开始吧 👆 做错的题会自动进错题本，也可以从错题本一键「错题重练」。</p>
+        <p className="quiz-empty">进入刷题页已自动出题，直接用 👆 做错的题会自动进错题本，也可以从错题本一键「错题重练」。想换考点在上方输入关键词即可。</p>
       )}
     </div>
   );
