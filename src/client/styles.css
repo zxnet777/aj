@@ -184,6 +184,7 @@ nav .nav-reset:hover { background: #ffd6d6 }
 
 /* 刷题页：考点输入自动联想下拉 */
 .quiz-controls { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; position: relative; z-index: 2 }
+.quiz-kp-select { flex: 1 1 240px }
 .quiz-kp-wrap { position: relative; flex: 1 1 220px }
 .quiz-kp-wrap input { width: 100%; box-sizing: border-box }
 .quiz-candidates { position: absolute; top: 100%; left: 0; right: 0; list-style: none; padding: 0; margin: 4px 0 0; background: #fff; border: 1px solid #ddd; border-radius: 10px; max-height: 240px; overflow-y: auto; box-shadow: 0 6px 18px rgba(0,0,0,.1); z-index: 10 }

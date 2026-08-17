@@ -8,7 +8,7 @@ function allKps(subject, outline) {
   return arr;
 }
 
-// 把整个大纲拍平成 [科目, 章节, 考点] 列表，用于“闯关模式”按章节顺序自动推进
+// 把整个大纲拍平成 [科目, 章节, 考点] 列表，用于"闯关模式"按章节顺序自动推进
 function flatKps(outline) {
   const arr = [];
   for (const subject in outline) {
@@ -39,8 +39,8 @@ export function startQuiz({ subject, knowledgePoint, retryQueue, kpQueue }) {
 }
 
 export default function QuizPanel() {
-  const [subject, setSubject] = useState('数学');
-  const [kp, setKp] = useState('');
+  const [subject, setSubject] = useState(''); // 先选科目
+  const [kp, setKp] = useState('');           // 再选知识点
   const [q, setQ] = useState(null);
   const [sel, setSel] = useState(null);
   const [feedback, setFeedback] = useState(null); // {correct, gained, correctAnswer}
@@ -61,7 +61,7 @@ export default function QuizPanel() {
   // 加载大纲，用于考点自动补全
   useEffect(() => { api.getTree().then((d) => setOutline(d.outline || {})).catch(() => {}); }, []);
 
-  // 首次进入刷题页：直接出题。若从知识地图“去刷这一题”带过来了指定考点，优先刷那个；否则取大纲第一个科目的第一个考点。
+  // 进入刷题页不自动出题：先选科目、再选知识点，才出题目。仅响应外部跳转（知识地图/错题本/章节闯关）。
   useEffect(() => {
     if (autoTried.current) return;
     autoTried.current = true;
@@ -72,15 +72,7 @@ export default function QuizPanel() {
       setKp(pending.knowledgePoint);
       loadQuestion(subj, pending.knowledgePoint);
       window.__pendingQuiz = null;
-      return;
     }
-    const firstSubject = Object.keys(outline)[0];
-    if (!firstSubject) { setErr('题库为空，先去知识地图看看～'); return; }
-    if (subject !== firstSubject) setSubject(firstSubject);
-    const all = allKps(firstSubject, outline);
-    const kpoint = all.length ? all[0] : '';
-    if (kpoint) loadQuestion(firstSubject, kpoint);
-    else setErr('题库为空，先去知识地图看看～');
   }, [outline]); // eslint-disable-line
 
   // 接收外部发起的刷题（知识地图/错题本/首页跳转）
@@ -221,45 +213,68 @@ export default function QuizPanel() {
       <h2>刷题</h2>
       {retry && <p className="quiz-retry-tag">{retry.mode === 'chapter' ? '📚 章节闯关中' : '🔁 错题重练中'}：第 {retry.index + 1} / {retry.queue.length} 题</p>}
       <div className="quiz-controls">
+        {/* 第一步：选科目 */}
         <select value={subject} onChange={(e) => {
           const s = e.target.value;
-          setSubject(s);
-          setKp(''); setCandidates([]); setShowCand(false); setRetry(null); window.__retryQueue = null;
-          // 切换科目后直接进入该科目第一个考点出题，无需手动操作
-          const all = allKps(s, outline);
-          if (all.length) loadQuestion(s, all[0]);
-          else { setQ(null); setErr('该科目题库为空，先去知识地图看看～'); }
+          setSubject(s); setKp(''); setQ(null); setRetry(null); window.__retryQueue = null; window.__kpQueue = null;
+          setCandidates([]); setShowCand(false); setErr(''); setMsg('');
         }}>
-          {subjects.map((s) => <option key={s}>{s}</option>)}
+          <option value="">① 选择科目</option>
+          {subjects.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
-        <div className="quiz-kp-wrap">
-          <input
-            placeholder="想指定考点？输入关键词，如 二次函数"
-            value={kp}
-            onChange={(e) => {
-              const v = e.target.value;
-              setKp(v);
-              const all = allKps(subject, outline);
-              const hits = v ? all.filter((k) => k.toLowerCase().includes(v.toLowerCase())) : [];
-              setCandidates(hits.slice(0, 8));
-              setShowCand(v.length > 0);
-            }}
-            onFocus={() => { if (kp.length) setShowCand(true); }}
-            onBlur={() => setTimeout(() => setShowCand(false), 180)}
-          />
-          {showCand && candidates.length > 0 && (
-            <ul className="quiz-candidates">
-              {candidates.map((k) => (
-                <li key={k} onMouseDown={() => { setKp(k); setShowCand(false); setRetry(null); window.__retryQueue = null; loadQuestion(subject, k); }}>
-                  {k}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-        <button onClick={() => { setRetry(null); window.__retryQueue = null; if (kp) loadQuestion(subject, kp); else { const all = allKps(subject, outline); if (all.length) loadQuestion(subject, all[0]); else setErr('该科目题库为空'); } }} disabled={busy}>换一题</button>
-        <button className="quiz-next-kp" onClick={() => { setRetry(null); window.__retryQueue = null; goNextKp(); }} disabled={busy}>下一考点 →</button>
+
+        {subject && (
+          <select className="quiz-kp-select" value={kp} onChange={(e) => {
+            const k = e.target.value;
+            setKp(k);
+            if (k) { setRetry(null); window.__retryQueue = null; window.__kpQueue = null; loadQuestion(subject, k); }
+            else setQ(null);
+          }}>
+            <option value="">② 选择知识点</option>
+            {Object.entries(outline[subject] || {}).map(([chapter, kps]) => (
+              <optgroup key={chapter} label={chapter}>
+                {kps.map((k) => <option key={k} value={k}>{k}</option>)}
+              </optgroup>
+            ))}
+          </select>
+        )}
+
+        {subject && (
+          <div className="quiz-kp-wrap">
+            <input
+              placeholder="不想翻？输入关键词快速定位，如 二次函数"
+              value={kp}
+              onChange={(e) => {
+                const v = e.target.value;
+                setKp(v); setQ(null);
+                const all = allKps(subject, outline);
+                const hits = v ? all.filter((k) => k.toLowerCase().includes(v.toLowerCase())) : [];
+                setCandidates(hits.slice(0, 8));
+                setShowCand(v.length > 0);
+              }}
+              onFocus={() => { if (kp.length) setShowCand(true); }}
+              onBlur={() => setTimeout(() => setShowCand(false), 180)}
+            />
+            {showCand && candidates.length > 0 && (
+              <ul className="quiz-candidates">
+                {candidates.map((k) => (
+                  <li key={k} onMouseDown={() => { setKp(k); setShowCand(false); setRetry(null); window.__retryQueue = null; window.__kpQueue = null; loadQuestion(subject, k); }}>
+                    {k}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </div>
+
+      {subject && !kp && !q && !retry && (
+        <p className="quiz-empty">👆 已选「{subject}」，再选一个知识点，题目就会出现～</p>
+      )}
+
+      {!subject && !q && !retry && (
+        <p className="quiz-empty">第一步：选科目；第二步：选知识点，题目立即出现 👆 做错的题会自动进错题本（重练答对即移出），也可以从错题本一键「错题重练」。</p>
+      )}
 
       {!q && showCand && candidates.length === 0 && kp.length > 0 && (
         <p className="quiz-err">没有找到含「{kp}」的考点，换个关键词试试～</p>
@@ -315,6 +330,8 @@ export default function QuizPanel() {
           {!feedback ? (
             <div className="quiz-actions">
               <button className="quiz-submit" onClick={submit} disabled={sel == null}>提交</button>
+              {!retry && <button className="quiz-next" onClick={next}>换一题</button>}
+              {!retry && <button className="quiz-next-kp" onClick={goNextKp}>下一考点 →</button>}
               <button className="quiz-fav" onClick={onToggleFav}>{favorited ? '⭐ 已收藏' : '☆ 收藏难题'}</button>
               <button className="quiz-ask" onClick={askCoach}>问学长讲讲</button>
             </div>
