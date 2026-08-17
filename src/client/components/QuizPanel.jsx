@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../api.js';
 
-const SUBJECTS = ['数学', '语文', '英语', '物理', '化学', '道法', '历史', '生物', '地理'];
-
 function allKps(subject, outline) {
   const ch = outline[subject] || {};
   const arr = [];
@@ -35,22 +33,28 @@ export default function QuizPanel() {
   const [retry, setRetry] = useState(null); // {queue, index} 错题重练状态
   const [favorited, setFavorited] = useState(false);
   const [msg, setMsg] = useState(''); // 轻提示（收藏等）
-  const [outline, setOutline] = useState({}); // {科目:{章节:[考点]}}
+  const [outline, setOutline] = useState({}); // {科目:{章节:[考点]}}，与知识地图（湖州科目）完全一致
   const [candidates, setCandidates] = useState([]); // 输入时联想候选
   const [showCand, setShowCand] = useState(false);
   const started = useRef(false);
   const autoTried = useRef(false); // 防止重复自动出题
 
+  // 科目列表直接取自大纲，保证刷题界面与知识地图（湖州中考科目）一一对应
+  const subjects = Object.keys(outline);
+
   // 加载大纲，用于考点自动补全
   useEffect(() => { api.getTree().then((d) => setOutline(d.outline || {})).catch(() => {}); }, []);
 
-  // 首次进入刷题页：直接出题（默认取该科目的一个考点），无需用户手动输入
+  // 首次进入刷题页：直接出题（默认取大纲第一个科目的第一个考点），无需用户手动输入
   useEffect(() => {
     if (autoTried.current) return;
     autoTried.current = true;
-    const all = allKps(subject, outline);
+    const firstSubject = Object.keys(outline)[0];
+    if (!firstSubject) { setErr('题库为空，先去知识地图看看～'); return; }
+    if (subject !== firstSubject) setSubject(firstSubject);
+    const all = allKps(firstSubject, outline);
     const kpoint = all.length ? all[0] : '';
-    if (kpoint) loadQuestion(subject, kpoint);
+    if (kpoint) loadQuestion(firstSubject, kpoint);
     else setErr('题库为空，先去知识地图看看～');
   }, [outline]); // eslint-disable-line
 
@@ -59,9 +63,10 @@ export default function QuizPanel() {
     const onPending = (e) => {
       const d = e.detail || window.__pendingQuiz;
       if (d && d.knowledgePoint) {
-        setSubject(d.subject || '数学');
+        const subj = d.subject || Object.keys(outline)[0] || '数学';
+        setSubject(subj);
         setKp(d.knowledgePoint);
-        loadQuestion(d.subject || '数学', d.knowledgePoint);
+        loadQuestion(subj, d.knowledgePoint);
       }
       window.__pendingQuiz = null;
     };
@@ -161,7 +166,7 @@ export default function QuizPanel() {
           if (all.length) loadQuestion(s, all[0]);
           else { setQ(null); setErr('该科目题库为空，先去知识地图看看～'); }
         }}>
-          {SUBJECTS.map((s) => <option key={s}>{s}</option>)}
+          {subjects.map((s) => <option key={s}>{s}</option>)}
         </select>
         <div className="quiz-kp-wrap">
           <input
