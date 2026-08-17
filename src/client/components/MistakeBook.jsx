@@ -27,6 +27,42 @@ export default function MistakeBook() {
     })) });
   };
 
+  // 导出当前筛选错题为文本文件（可打印复习）
+  const exportTxt = () => {
+    if (!filtered.length) return;
+    const lines = ['阿杰学长 · 错题本导出', '导出时间：' + new Date().toLocaleString(), ''];
+    filtered.forEach((m, i) => {
+      lines.push(`${i + 1}. [${m.subject} · ${m.knowledge_point}]`);
+      lines.push('   题目：' + m.question);
+      lines.push('   正确答案：' + m.answer);
+      if (m.options) lines.push('   选项：' + m.options);
+      if (m.explanation) lines.push('   解析：' + m.explanation);
+      lines.push('');
+    });
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = '错题本_' + new Date().toISOString().slice(0, 10) + '.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // 打印当前筛选错题
+  const printMistakes = () => {
+    if (!filtered.length) return;
+    const win = window.open('', '_blank');
+    if (!win) return;
+    const rows = filtered.map((m, i) => `
+      <div style="margin-bottom:14px;page-break-inside:avoid">
+        <b>${i + 1}. [${m.subject} · ${m.knowledge_point}]</b><br/>
+        题目：${m.question}<br/>
+        正确答案：<b>${m.answer}</b><br/>
+        ${m.explanation ? '解析：' + m.explanation + '<br/>' : ''}
+      </div>`).join('');
+    win.document.write(`<html><head><title>错题本</title></head><body style="font-family:sans-serif;padding:24px"><h2>阿杰学长 · 错题本</h2>${rows}<script>window.onload=()=>window.print()</script></body></html>`);
+    win.document.close();
+  };
+
   const now = Date.now();
   const filtered = list.filter((m) => {
     if (subjectFilter !== '全部' && m.subject !== subjectFilter) return false;
@@ -46,6 +82,8 @@ export default function MistakeBook() {
           {['全部', '一周内', '一月内'].map((t) => <option key={t}>{t}</option>)}
         </select>
         <button className="mb-retry-all" onClick={retryAll} disabled={!list.length}>🔁 错题重练（{list.length}）</button>
+        <button className="mb-export" onClick={exportTxt} disabled={!filtered.length}>⬇ 导出</button>
+        <button className="mb-print" onClick={printMistakes} disabled={!filtered.length}>🖨 打印</button>
       </div>
 
       {filtered.length === 0 && <p className="mb-empty">暂无错题，保持住 💪</p>}

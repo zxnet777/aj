@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../api.js';
 
-const HISTORY_KEY = 'chat-history-阿杰学长';
-
 export default function ChatPanel() {
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  const [history, setHistory] = useState(() => { try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch { return []; } });
+  const [history, setHistory] = useState([]); // 从后端同步，不再纯本地
   const boxRef = useRef(null);
 
-  useEffect(() => { localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(-50))); }, [history]);
+  // 拉取已保存的聊天记录（后端持久化，重置/换设备不丢）
+  useEffect(() => {
+    api.getChat().then((rows) => setHistory(rows.map((r) => ({ role: r.role, text: r.content })))).catch(() => {});
+  }, []);
   useEffect(() => {
     if (boxRef.current) boxRef.current.scrollTop = boxRef.current.scrollHeight;
   }, [history, busy]);
@@ -34,16 +35,22 @@ export default function ChatPanel() {
     window.__lastQuizCtx = null;
     const userMsg = { role: 'user', text };
     setHistory((h) => [...h, userMsg]);
+    api.addChat('user', text).catch(() => {});
     setInput(''); setBusy(true); setErr('');
     const payload = { subject: ctx?.subject || '', question: ctx?.question || text, knowledgePoint: ctx?.knowledgePoint || '', history: history.filter((m) => m.role === 'assistant' || m.role === 'user').map((m) => ({ role: m.role, content: m.text })) };
     api.chat(payload).then((reply) => {
       const r = typeof reply === 'string' ? reply : reply.reply || reply;
       const encouragement = (typeof reply === 'object' && reply.encouragement) ? `\n\n💪 ${reply.encouragement}` : '';
-      setHistory((h) => [...h, { role: 'assistant', text: r + encouragement }]);
+      const full = r + encouragement;
+      setHistory((h) => [...h, { role: 'assistant', text: full }]);
+      api.addChat('assistant', full).catch(() => {});
     }).catch((e) => setErr('阿杰学长没回上来：' + e.message)).finally(() => setBusy(false));
   };
 
-  const clearHistory = () => { if (window.confirm('清空聊天记录？')) setHistory([]); };
+  const clearHistory = () => {
+    if (!window.confirm('清空聊天记录？')) return;
+    api.clearChat().then(() => setHistory([])).catch(() => setHistory([]));
+  };
 
   return (
     <div className="chat">

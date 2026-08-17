@@ -66,6 +66,13 @@ db.exec(`
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, question)
   );
+  CREATE TABLE IF NOT EXISTS chat_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    role TEXT,
+    content TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
 `);
 // 兼容已存在的旧库：补充缺失列（新库 CREATE 已含，跳过错误）
 try { db.exec('ALTER TABLE knowledge_mastery ADD COLUMN reviews INTEGER DEFAULT 0'); } catch {}

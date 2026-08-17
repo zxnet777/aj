@@ -1,20 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../api.js';
+import { flatKps } from '../util.js';
 
 function allKps(subject, outline) {
   const ch = outline[subject] || {};
   const arr = [];
   for (const c in ch) for (const kp of ch[c]) arr.push(kp);
-  return arr;
-}
-
-// 把整个大纲拍平成 [科目, 章节, 考点] 列表，用于"闯关模式"按章节顺序自动推进
-function flatKps(outline) {
-  const arr = [];
-  for (const subject in outline) {
-    const ch = outline[subject];
-    for (const chapter in ch) for (const kp of ch[chapter]) arr.push({ subject, chapter, kp });
-  }
   return arr;
 }
 
@@ -52,7 +43,6 @@ export default function QuizPanel() {
   const [outline, setOutline] = useState({}); // {科目:{章节:[考点]}}，与知识地图（湖州科目）完全一致
   const [candidates, setCandidates] = useState([]); // 输入时联想候选
   const [showCand, setShowCand] = useState(false);
-  const started = useRef(false);
   const autoTried = useRef(false); // 防止重复自动出题
 
   // 科目列表直接取自大纲，保证刷题界面与知识地图（湖州中考科目）一一对应
@@ -112,7 +102,7 @@ export default function QuizPanel() {
   const loadQuestion = (subj, kpoint) => {
     setBusy(true); setErr(''); setSel(null); setFeedback(null); setFavorited(false);
     api.quizNext({ subject: subj, knowledgePoint: kpoint }).then((data) => {
-      if (data && data.question) { setQ(data); started.current = true; }
+      if (data && data.question) { setQ(data); }
       else { setQ(null); setErr('这个考点暂时没有题目，换个考点试试～'); }
     }).catch((e) => setErr('出题失败：' + e.message)).finally(() => setBusy(false));
   };
@@ -123,7 +113,7 @@ export default function QuizPanel() {
     setSubject(item.subject); setKp(item.knowledgePoint);
     setBusy(true); setErr(''); setSel(null); setFeedback(null); setFavorited(false);
     api.quizNext({ subject: item.subject, knowledgePoint: item.knowledgePoint }).then((data) => {
-      if (data && data.question) { setQ(data); started.current = true; }
+      if (data && data.question) { setQ(data); }
       else {
         // 该考点抽不到题则跳过，直接进下一题
         const next = index + 1;
@@ -140,7 +130,7 @@ export default function QuizPanel() {
     setSubject(item.subject); setKp(item.knowledgePoint);
     setBusy(true); setErr(''); setSel(null); setFeedback(null); setFavorited(false);
     api.quizNext({ subject: item.subject, knowledgePoint: item.knowledgePoint }).then((data) => {
-      if (data && data.question) { setQ(data); started.current = true; }
+      if (data && data.question) { setQ(data); }
       else {
         const next = index + 1;
         setRetry({ queue, index: next, mode: 'chapter' });
@@ -192,6 +182,16 @@ export default function QuizPanel() {
     else { setMsg('🎉 已是最后一个考点，闯关完成！'); setTimeout(() => setMsg(''), 1500); }
   };
 
+  // 随手刷：从全部科目·考点里随机抽一题
+  const randomQuiz = () => {
+    const flat = flatKps(outline);
+    if (!flat.length) { setErr('大纲还没加载好，稍等一下～'); return; }
+    const pick = flat[Math.floor(Math.random() * flat.length)];
+    setSubject(pick.subject); setKp(pick.kp); setRetry(null);
+    window.__retryQueue = null; window.__kpQueue = null;
+    loadQuestion(pick.subject, pick.kp);
+  };
+
   const onToggleFav = () => {
     if (!q) return;
     api.toggleFavorite({
@@ -214,6 +214,7 @@ export default function QuizPanel() {
       {retry && <p className="quiz-retry-tag">{retry.mode === 'chapter' ? '📚 章节闯关中' : '🔁 错题重练中'}：第 {retry.index + 1} / {retry.queue.length} 题</p>}
       <div className="quiz-controls">
         {/* 第一步：选科目 */}
+        <button className="quiz-random" type="button" onClick={randomQuiz}>🎲 随机一题</button>
         <select value={subject} onChange={(e) => {
           const s = e.target.value;
           setSubject(s); setKp(''); setQ(null); setRetry(null); window.__retryQueue = null; window.__kpQueue = null;
@@ -355,7 +356,7 @@ export default function QuizPanel() {
       )}
 
       {!q && !busy && !err && !msg && (
-        <p className="quiz-empty">进入刷题页已自动出题，直接用 👆 做错的题会自动进错题本（重练答对即移出），也可以从错题本一键「错题重练」。想连着刷下一考点点「下一考点 →」开启闯关；想指定考点在上方输入关键词即可。</p>
+        <p className="quiz-empty">第一步选科目、第二步选知识点，题目立即出现 👆 做错的题会自动进错题本（重练答对即移出），也可以从错题本一键「错题重练」。想连着刷点「下一考点 →」开启闯关；想指定考点在上方输入关键词即可；想随手刷点「🎲 随机一题」。</p>
       )}
     </div>
   );

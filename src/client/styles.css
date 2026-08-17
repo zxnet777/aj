@@ -190,3 +190,28 @@ nav .nav-reset:hover { background: #ffd6d6 }
 .quiz-candidates { position: absolute; top: 100%; left: 0; right: 0; list-style: none; padding: 0; margin: 4px 0 0; background: #fff; border: 1px solid #ddd; border-radius: 10px; max-height: 240px; overflow-y: auto; box-shadow: 0 6px 18px rgba(0,0,0,.1); z-index: 10 }
 .quiz-candidates li { padding: 10px 12px; cursor: pointer; border-bottom: 1px solid #f2f2f2 }
 .quiz-candidates li:hover { background: #eef2ff }
+
+/* 刷题页：随机一题快入口 */
+.quiz-random { background: #fff4ec; color: #d2691e; border: 1px solid #ffd2b0; border-radius: 10px; padding: 8px 14px; cursor: pointer; font-weight: 600; flex: 0 0 auto }
+
+/* 知识地图：全局搜索 */
+.km-search { display: flex; align-items: center; gap: 8px; margin: 10px 0 4px }
+.km-search input { flex: 1; padding: 10px 12px; border: 1px solid #ddd; border-radius: 10px; font-size: 14px }
+.km-search-count { color: #889; font-size: 13px; white-space: nowrap }
+.km-search-clear { background: none; border: none; color: #c0392b; cursor: pointer; font-size: 14px; margin-left: 4px }
+.km-kp-hit { background: #fff7d6; border-radius: 8px; padding: 2px 6px; margin-left: -6px }
+
+/* 收藏列表 */
+.favorites h2 { margin: 8px 0 12px }
+.fav-list { list-style: none; padding: 0; margin: 0 }
+.fav-item { background: #fff; border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; border-left: 4px solid #ffb300 }
+.fav-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 12px; color: #888 }
+.fav-q { margin: 6px 0; font-weight: 500 }
+.fav-actions { margin-top: 8px }
+.fav-item .quiz-subject { background: #eef2ff; color: #4356c8; border-radius: 6px; padding: 2px 8px }
+.fav-item .quiz-kp { background: #fff4ec; color: #d2691e; border-radius: 6px; padding: 2px 8px }
+.fav-item .quiz-next { background: #4356c8; color: #fff; border: none; border-radius: 8px; padding: 6px 12px; cursor: pointer }
+
+/* 错题本：导出/打印 */
+.mb-export, .mb-print { background: #f3f4f6; color: #444; border: none; border-radius: 10px; padding: 8px 14px; cursor: pointer }
+.mb-export:hover, .mb-print:hover { background: #e9ecef }

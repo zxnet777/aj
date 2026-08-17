@@ -5,6 +5,7 @@ import ChatPanel from './components/ChatPanel.jsx';
 import QuizPanel from './components/QuizPanel.jsx';
 import MistakeBook from './components/MistakeBook.jsx';
 import KnowledgeMap from './components/KnowledgeMap.jsx';
+import Favorites from './components/Favorites.jsx';
 import GameBar from './components/GameBar.jsx';
 
 export default function App() {
@@ -37,8 +38,8 @@ export default function App() {
       {fatal && <div className="banner err" onClick={() => setFatal(null)}>⚠️ {fatal}（点击关闭）</div>}
       <GameBar />
       <nav>
-        {['home', 'chat', 'quiz', 'mistakes', 'knowledge'].map((t) => (
-          <button key={t} onClick={() => setTab(t)}>{t === 'home' ? '首页' : t === 'chat' ? '问学长' : t === 'quiz' ? '刷题' : t === 'mistakes' ? '错题' : '知识'}</button>
+        {['home', 'chat', 'quiz', 'mistakes', 'favorites', 'knowledge'].map((t) => (
+          <button key={t} onClick={() => setTab(t)}>{t === 'home' ? '首页' : t === 'chat' ? '问学长' : t === 'quiz' ? '刷题' : t === 'mistakes' ? '错题' : t === 'favorites' ? '收藏' : '知识'}</button>
         ))}
         <button className="nav-reset" onClick={onReset}>↺ 重置</button>
       </nav>
@@ -46,6 +47,7 @@ export default function App() {
       {tab === 'chat' && <ChatPanel />}
       {tab === 'quiz' && <QuizPanel />}
       {tab === 'mistakes' && <MistakeBook />}
+      {tab === 'favorites' && <Favorites />}
       {tab === 'knowledge' && <KnowledgeMap />}
     </div>
   );

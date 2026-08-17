@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import Companion from './Companion.jsx';
 import { startQuiz } from './QuizPanel.jsx';
+import { flatKps } from '../util.js';
 
 function findChapter(outline, kp) {
   if (!outline) return null;
@@ -9,15 +10,6 @@ function findChapter(outline, kp) {
     if (outline[subject][chapter].includes(kp)) return chapter;
   }
   return null;
-}
-
-// 把大纲拍平成有序列表，方便在卡片上做"上一考点/下一考点"导航
-function flatKps(outline) {
-  const arr = [];
-  for (const subject in outline) for (const chapter in outline[subject]) {
-    for (const kp of outline[subject][chapter]) arr.push({ subject, chapter, kp });
-  }
-  return arr;
 }
 
 // 掌握度 -> 红绿灯颜色
@@ -57,7 +49,26 @@ export default function KnowledgeMap() {
   const [badges, setBadges] = useState([]);     // 已解锁徽章 key 列表
   const [celebrate, setCelebrate] = useState(null); // 解锁徽章庆祝
   const [err, setErr] = useState(null);          // 全局错误提示
+  const [query, setQuery] = useState('');         // 全局考点搜索
   const [tip] = useState(() => DAILY_TIPS[new Date().getDate() % DAILY_TIPS.length]);
+
+  const q = query.trim().toLowerCase();
+  // 搜索命中：含关键词的考点集合（subject||kp）
+  const hitKps = {};
+  const searchOpen = {}; // 搜索时自动展开的科目/章节键
+  if (q && outline) {
+    for (const subject in outline) for (const chapter in outline[subject]) {
+      for (const kp of outline[subject][chapter]) {
+        if (kp.toLowerCase().includes(q) || subject.toLowerCase().includes(q)) {
+          hitKps[subject + '||' + kp] = true;
+          searchOpen[subject] = true;
+          searchOpen[subject + '/' + chapter] = true;
+        }
+      }
+    }
+  }
+  // 展开判定：搜索时按命中自动展开，否则按用户点击的 open
+  const isOpen = (k) => (q ? !!searchOpen[k] : !!open[k]);
 
   useEffect(() => {
     loadTree();
@@ -171,6 +182,20 @@ export default function KnowledgeMap() {
         })}
       </div>
 
+      <div className="km-search">
+        <input
+          placeholder="🔍 搜考点或科目，如 二次函数 / 数学"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+        {q && (
+          <span className="km-search-count">
+            {Object.keys(hitKps).length ? `命中 ${Object.keys(hitKps).length} 个考点` : '没有匹配的考点'}
+            <button className="km-search-clear" onClick={() => setQuery('')}>✕</button>
+          </span>
+        )}
+      </div>
+
       <p className="km-tip">💡 {tip}</p>
 
       <p className="hint">点科目展开章节，点知识点看掌握度；卡住就点「帮我总结」让阿杰学长帮你理清体系。🏷️ 标签=该知识点中考常见考法。每梳理一个知识点都能赚 ⭐，攒积分升级！</p>
@@ -189,23 +214,23 @@ export default function KnowledgeMap() {
           {Object.entries(outline).map(([subject, chapters]) => (
             <div key={subject} className="km-subject">
               <button className="km-head" onClick={() => toggle(subject)}>
-                {open[subject] ? '▾' : '▸'} {subject}
+                {isOpen(subject) ? '▾' : '▸'} {subject}
               </button>
-              {open[subject] && (
+              {isOpen(subject) && (
                 <div className="km-chapters">
                   {Object.entries(chapters).map(([chapter, kps]) => (
                     <div key={chapter} className="km-chapter">
                       <button className="km-head" onClick={() => toggle(subject + '/' + chapter)}>
-                        {open[subject + '/' + chapter] ? '▾' : '▸'} {chapter}
+                        {isOpen(subject + '/' + chapter) ? '▾' : '▸'} {chapter}
                       </button>
-                      {open[subject + '/' + chapter] && (
+                      {isOpen(subject + '/' + chapter) && (
                         <>
                           <button className="km-chapter-quiz" onClick={() => {
                             startQuiz({ kpQueue: kps.map((kp) => ({ subject, knowledgePoint: kp })) });
                           }}>📚 刷本章（{kps.length} 个考点依次闯关）</button>
                           <ul className="km-kps">
                             {kps.map((kp) => (
-                              <li key={kp}>
+                              <li key={kp} className={hitKps[subject + '||' + kp] ? 'km-kp-hit' : ''}>
                                 <span className="km-light">{light(master(subject, kp))}</span>
                                 <span>{kp}</span>
                                 {(examFocus[kp] || []).map((t, i) => (

@@ -47,17 +47,16 @@ app.get('/api/progress', async (req, res) => {
   const u = db.prepare('SELECT points,level,streak FROM users WHERE id=?').get(SELF_ID);
   const weakness = await getWeakness(SELF_ID); // {redLight:[kp], greenLight:[kp]}
   const badges = getBadges(SELF_ID);
+  // 统一掌握度：computeMastery 为唯一口径（<60 红、>=60 绿），首页与知识地图一致
+  const mastery = computeMastery(SELF_ID);
+  const litCount = Object.values(mastery).filter((v) => v >= 60).length;
   // 累计答对 & 各考点正确率（供首页显示薄弱比例）
   const recs = db.prepare('SELECT knowledge_point, correct FROM quiz_records WHERE user_id=?').all(SELF_ID);
   let totalCorrect = 0;
   const rateMap = {};
   for (const r of recs) { if (r.correct) totalCorrect++; const k = r.knowledge_point; if (!rateMap[k]) rateMap[k] = { t: 0, c: 0 }; rateMap[k].t++; if (r.correct) rateMap[k].c++; }
-  // 首页薄弱/已掌握与知识地图统一口径：以 computeMastery 为准（<60 红、>=60 绿）
   const weaknessList = Object.entries(mastery).filter(([, v]) => v < 60).map(([kp]) => ({ knowledgePoint: kp, correctRate: rateMap[kp] ? rateMap[kp].c / rateMap[kp].t : 0 }));
   const masteredList = Object.entries(mastery).filter(([, v]) => v >= 60).map(([kp]) => ({ knowledgePoint: kp }));
-  // 已掌握考点数 = 点亮（mastery>=60）的数量
-  const mastery = computeMastery(SELF_ID);
-  const litCount = Object.values(mastery).filter((v) => v >= 60).length;
   // 近 7 天打卡标记（checkins.day 存打卡日期 TEXT，如 2026-08-15）
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const checkinRows = db.prepare('SELECT day FROM checkins WHERE user_id=?').all(SELF_ID).map((x) => x.day);
@@ -87,10 +86,35 @@ app.post('/api/mistakes/remove', (req, res) => {
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// 聊天记录：拉取（同步到后端，替代纯 localStorage）
+app.get('/api/chat', (req, res) => {
+  try {
+    const rows = db.prepare('SELECT role, content, created_at FROM chat_messages WHERE user_id=? ORDER BY id ASC').all(SELF_ID);
+    res.json(rows);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 追加一条聊天消息（role: 'user' | 'assistant'）
+app.post('/api/chat', (req, res) => {
+  try {
+    const { role, content } = req.body || {};
+    if (!role || !content) return res.status(400).json({ error: '缺少 role 或 content' });
+    db.prepare('INSERT INTO chat_messages (user_id, role, content) VALUES (?,?,?)').run(SELF_ID, role, content);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 清空聊天记录
+app.delete('/api/chat', (req, res) => {
+  try { db.prepare('DELETE FROM chat_messages WHERE user_id=?').run(SELF_ID); res.json({ success: true }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // 重置：清空当前用户全部使用数据，回到初始阶段（保留账号）
 app.post('/api/reset', (req, res) => {
   try {
     resetUser(SELF_ID);
+    db.prepare('DELETE FROM chat_messages WHERE user_id=?').run(SELF_ID);
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
