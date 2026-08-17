@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import Companion from './Companion.jsx';
+import { startQuiz } from './QuizPanel.jsx';
 
 function findChapter(outline, kp) {
   if (!outline) return null;
@@ -198,18 +199,29 @@ export default function KnowledgeMap() {
                         {open[subject + '/' + chapter] ? '▾' : '▸'} {chapter}
                       </button>
                       {open[subject + '/' + chapter] && (
-                        <ul className="km-kps">
-                          {kps.map((kp) => (
-                            <li key={kp}>
-                              <span className="km-light">{light(master(subject, kp))}</span>
-                              <span>{kp}</span>
-                              {(examFocus[kp] || []).map((t, i) => (
-                                <span key={i} className="km-tag" title="中考常见考法">{t}</span>
-                              ))}
-                              <button className="km-sum" onClick={() => summarize(subject, chapter, kp)}>帮我总结</button>
-                            </li>
-                          ))}
-                        </ul>
+                        <>
+                          <button className="km-chapter-quiz" onClick={() => {
+                            startQuiz({ kpQueue: kps.map((kp) => ({ subject, knowledgePoint: kp })) });
+                          }}>📚 刷本章（{kps.length} 个考点依次闯关）</button>
+                          <ul className="km-kps">
+                            {kps.map((kp) => (
+                              <li key={kp}>
+                                <span className="km-light">{light(master(subject, kp))}</span>
+                                <span>{kp}</span>
+                                {(examFocus[kp] || []).map((t, i) => (
+                                  <span key={i} className="km-tag" title="中考常见考法">{t}</span>
+                                ))}
+                                <button className="km-sum" onClick={() => summarize(subject, chapter, kp)}>帮我总结</button>
+                                <button className="km-goquiz" onClick={() => {
+                                  const detail = { subject, knowledgePoint: kp };
+                                  window.__pendingQuiz = detail;
+                                  window.dispatchEvent(new CustomEvent('goto-quiz', { detail }));
+                                  window.dispatchEvent(new CustomEvent('goto-tab', { detail: 'quiz' }));
+                                }}>去刷</button>
+                              </li>
+                            ))}
+                          </ul>
+                        </>
                       )}
                     </div>
                   ))}

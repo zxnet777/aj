@@ -23,6 +23,9 @@ button { font-family: inherit }
 .km-kps li { display: flex; align-items: center; gap: 8px; padding: 4px 0 }
 .km-light { font-size: 14px }
 .km-sum { background: #4f7cff; color: #fff; border: none; border-radius: 8px; padding: 4px 10px; cursor: pointer; font-size: 12px }
+.km-goquiz { background: #ff8a3d; color: #fff; border: none; border-radius: 8px; padding: 4px 10px; cursor: pointer; font-size: 12px; font-weight: 600 }
+.km-goquiz:hover { background: #ff771f }
+.km-chapter-quiz { background: #fff4ec; color: #d2691e; border: 1px solid #ffd2b0; border-radius: 10px; padding: 6px 12px; cursor: pointer; font-size: 13px; font-weight: 600; margin: 4px 0 8px 12px }
 .km-card { background: #fff; border-radius: 12px; padding: 12px; margin: 12px 0 }
 .km-card h3 { margin: 8px 0 }
 .km-tag { background: #eef2ff; color: #4f5bd5; border-radius: 6px; padding: 1px 6px; font-size: 11px; margin-left: 2px }
@@ -127,6 +130,8 @@ nav .nav-reset:hover { background: #ffd6d6 }
 .quiz-explain { color: #444; font-size: 14px; background: #f6f7fb; border-radius: 8px; padding: 8px }
 .quiz-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px }
 .quiz-submit, .quiz-next { background: #4356c8; color: #fff; border: none; border-radius: 10px; padding: 10px 16px; cursor: pointer }
+.quiz-next-kp { background: #ff8a3d; color: #fff; border: none; border-radius: 10px; padding: 10px 16px; cursor: pointer; font-weight: 600 }
+.quiz-next-kp:hover { background: #ff771f }
 .quiz-fav { background: #fff7e6; color: #b8860b; border: none; border-radius: 10px; padding: 10px 14px; cursor: pointer }
 .quiz-ask { background: #eef2ff; color: #4356c8; border: none; border-radius: 10px; padding: 10px 14px; cursor: pointer }
 .quiz-summary { background: #f0fdf4; color: #2b8a3e; border: none; border-radius: 10px; padding: 10px 14px; cursor: pointer }

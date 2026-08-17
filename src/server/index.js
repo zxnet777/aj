@@ -1,7 +1,7 @@
 import express from 'express';
 import { explainQuestion, generateQuiz, usingMock } from './ai.js';
 import { addPoints, getBadges } from './gamify.js';
-import { addMistake, getMistakes, getWeakness, resetUser, toggleFavorite, getFavorites } from './mistakes.js';
+import { addMistake, getMistakes, getWeakness, resetUser, toggleFavorite, getFavorites, removeMistake } from './mistakes.js';
 import { getOutline, computeMastery, getMastery, mergeMastery, summarize } from './knowledge.js';
 import { db, ensureUser } from './db.js';
 
@@ -52,8 +52,9 @@ app.get('/api/progress', async (req, res) => {
   let totalCorrect = 0;
   const rateMap = {};
   for (const r of recs) { if (r.correct) totalCorrect++; const k = r.knowledge_point; if (!rateMap[k]) rateMap[k] = { t: 0, c: 0 }; rateMap[k].t++; if (r.correct) rateMap[k].c++; }
-  const weaknessList = (weakness.redLight || []).map((kp) => ({ knowledgePoint: kp, correctRate: rateMap[kp] ? rateMap[kp].c / rateMap[kp].t : 0 }));
-  const masteredList = (weakness.greenLight || []).map((kp) => ({ knowledgePoint: kp }));
+  // 首页薄弱/已掌握与知识地图统一口径：以 computeMastery 为准（<60 红、>=60 绿）
+  const weaknessList = Object.entries(mastery).filter(([, v]) => v < 60).map(([kp]) => ({ knowledgePoint: kp, correctRate: rateMap[kp] ? rateMap[kp].c / rateMap[kp].t : 0 }));
+  const masteredList = Object.entries(mastery).filter(([, v]) => v >= 60).map(([kp]) => ({ knowledgePoint: kp }));
   // 已掌握考点数 = 点亮（mastery>=60）的数量
   const mastery = computeMastery(SELF_ID);
   const litCount = Object.values(mastery).filter((v) => v >= 60).length;
@@ -80,6 +81,11 @@ app.post('/api/favorites', (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 app.get('/api/favorites', (req, res) => res.json(getFavorites(SELF_ID)));
+// 错题重练答对后移出错题本（按 用户+科目+考点 清除）
+app.post('/api/mistakes/remove', (req, res) => {
+  try { res.json(removeMistake(SELF_ID, { subject: req.body.subject, knowledgePoint: req.body.knowledgePoint })); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
 
 // 重置：清空当前用户全部使用数据，回到初始阶段（保留账号）
 app.post('/api/reset', (req, res) => {

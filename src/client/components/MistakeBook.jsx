@@ -59,7 +59,7 @@ export default function MistakeBook() {
               <span className="mb-time">{m.created_at ? m.created_at.slice(0, 10) : ''}</span>
             </div>
             <p className="mb-q">{m.question}</p>
-            <p className="mb-ans">你的答案：<b className="mb-mine">{m.answer}</b> ｜ 正确答案：<b>{m.correct_answer}</b></p>
+            <p className="mb-ans">正确答案：<b>{m.answer}</b></p>
             <button className="mb-go" onClick={(e) => { e.stopPropagation(); retryOne(m); }}>→ 重刷</button>
           </li>
         ))}

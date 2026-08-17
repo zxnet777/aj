@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { QUIZBANK } from './quizbank.js';
+import { getLocalSummary } from './summaries.js';
 let client;
 function getClient() {
   if (!client) {
@@ -49,7 +50,22 @@ async function callWithFallback(realCall, mock) {
   }
 }
 
-export async function explainQuestion({ subject, question, history = [] }) {
+export async function explainQuestion({ subject, question, knowledgePoint, history = [] }) {
+  // 演示模式：基于本地考点卡给出针对性讲解，而非千篇一律的话术
+  if (!HAS_KEY) {
+    const card = knowledgePoint ? getLocalSummary(subject, knowledgePoint) : null;
+    const lines = [];
+    if (card && card.desc) lines.push(card.desc);
+    if (card && card.key) lines.push(`🔑 关键：${card.key}`);
+    if (card && card.eg) lines.push(`✏️ 例子：${card.eg}`);
+    if (card && card.mistake) lines.push(`⚠️ 易错：${card.mistake}`);
+    if (card && card.method) lines.push(`🧭 方法：${card.method}`);
+    if (card && card.analogy) lines.push(`💡 类比：${card.analogy}`);
+    const reply = lines.length
+      ? `同学你好！这道题的考点是「${knowledgePoint}」，学长给你划一下重点：\n\n${lines.join('\n')}\n\n你先对照选项排除明显错的，卡住的地方告诉我，我陪你一步步推～`
+      : MOCK.explain.reply;
+    return { reply, encouragement: MOCK.explain.encouragement };
+  }
   return callWithFallback(async () => {
     const msgs = [
       { role: 'system', content: SYSTEM },

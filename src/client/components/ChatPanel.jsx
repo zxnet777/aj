@@ -15,25 +15,31 @@ export default function ChatPanel() {
     if (boxRef.current) boxRef.current.scrollTop = boxRef.current.scrollHeight;
   }, [history, busy]);
 
-  // 刷题页把当前题甩过来，自动发起讲解
+  // 刷题页把当前题甩过来，自动发起讲解（界面只显示友好提示，题目结构化数据作为隐藏上下文传给 AI）
   useEffect(() => {
     const q = window.__pendingChatQuestion;
     if (q) {
       window.__pendingChatQuestion = null;
-      const text = `帮我讲讲这道${q.subject}题【${q.knowledgePoint}】\n题目：${q.question}\n选项：${(q.options || []).join(' / ')}\n我的答案：${q.answer}\n${q.explanation ? '参考解析：' + q.explanation : ''}`;
-      setInput(text);
-      send(text);
+      const userText = `帮我讲讲这道题（考点：${q.knowledgePoint}）📖`;
+      const ctx = { subject: q.subject, question: q.question, knowledgePoint: q.knowledgePoint, options: q.options, answer: q.answer, explanation: q.explanation };
+      send(userText, ctx);
     }
   }, []);
 
-  const send = (forced) => {
-    const text = (forced != null ? forced : input).trim();
+  const send = (forcedText, forcedCtx) => {
+    const text = (forcedText != null ? forcedText : input).trim();
     if (!text || busy) return;
+    // 普通提问时，把上一条甩题的隐藏上下文一并带上（若有）
+    const ctx = forcedCtx || window.__lastQuizCtx || null;
+    window.__lastQuizCtx = null;
     const userMsg = { role: 'user', text };
     setHistory((h) => [...h, userMsg]);
     setInput(''); setBusy(true); setErr('');
-    api.chat(text, history.map((m) => ({ role: m.role, content: m.text }))).then((reply) => {
-      setHistory((h) => [...h, { role: 'assistant', text: reply }]);
+    const payload = { subject: ctx?.subject || '', question: ctx?.question || text, knowledgePoint: ctx?.knowledgePoint || '', history: history.filter((m) => m.role === 'assistant' || m.role === 'user').map((m) => ({ role: m.role, content: m.text })) };
+    api.chat(payload).then((reply) => {
+      const r = typeof reply === 'string' ? reply : reply.reply || reply;
+      const encouragement = (typeof reply === 'object' && reply.encouragement) ? `\n\n💪 ${reply.encouragement}` : '';
+      setHistory((h) => [...h, { role: 'assistant', text: r + encouragement }]);
     }).catch((e) => setErr('阿杰学长没回上来：' + e.message)).finally(() => setBusy(false));
   };
 

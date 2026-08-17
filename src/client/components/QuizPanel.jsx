@@ -8,15 +8,31 @@ function allKps(subject, outline) {
   return arr;
 }
 
-// 触发刷题：可带单个考点或一组错题（用于"错题重练"）
-export function startQuiz({ subject, knowledgePoint, retryQueue }) {
+// 把整个大纲拍平成 [科目, 章节, 考点] 列表，用于“闯关模式”按章节顺序自动推进
+function flatKps(outline) {
+  const arr = [];
+  for (const subject in outline) {
+    const ch = outline[subject];
+    for (const chapter in ch) for (const kp of ch[chapter]) arr.push({ subject, chapter, kp });
+  }
+  return arr;
+}
+
+// 触发刷题：可带单个考点、一组错题（"错题重练"）或一章考点（"章节闯关"）
+export function startQuiz({ subject, knowledgePoint, retryQueue, kpQueue }) {
   if (retryQueue && retryQueue.length) {
     window.__retryQueue = retryQueue; // [{subject, knowledgePoint, question, answer, options, explanation}]
     window.__pendingQuiz = null;
     window.dispatchEvent(new CustomEvent('start-retry'));
+  } else if (kpQueue && kpQueue.length) {
+    window.__kpQueue = kpQueue; // [{subject, knowledgePoint}]
+    window.__pendingQuiz = null;
+    window.__retryQueue = null;
+    window.dispatchEvent(new CustomEvent('start-kp-queue'));
   } else {
     window.__pendingQuiz = { subject, knowledgePoint };
     window.__retryQueue = null;
+    window.__kpQueue = null;
     window.dispatchEvent(new CustomEvent('goto-quiz', { detail: { subject, knowledgePoint } }));
   }
   window.dispatchEvent(new CustomEvent('goto-tab', { detail: 'quiz' }));
@@ -30,7 +46,7 @@ export default function QuizPanel() {
   const [feedback, setFeedback] = useState(null); // {correct, gained, correctAnswer}
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  const [retry, setRetry] = useState(null); // {queue, index} 错题重练状态
+  const [retry, setRetry] = useState(null); // {queue, index, mode} 错题重练/章节闯关状态
   const [favorited, setFavorited] = useState(false);
   const [msg, setMsg] = useState(''); // 轻提示（收藏等）
   const [outline, setOutline] = useState({}); // {科目:{章节:[考点]}}，与知识地图（湖州科目）完全一致
@@ -82,14 +98,23 @@ export default function QuizPanel() {
     const onRetry = () => {
       const queue = window.__retryQueue;
       if (queue && queue.length) {
-        setRetry({ queue, index: 0 });
+        setRetry({ queue, index: 0, mode: 'retry' });
         loadRetry(0, queue);
       }
       window.__retryQueue = null;
     };
+    const onKpQueue = () => {
+      const queue = window.__kpQueue;
+      if (queue && queue.length) {
+        setRetry({ queue, index: 0, mode: 'chapter' });
+        loadKp(0, queue);
+      }
+      window.__kpQueue = null;
+    };
     window.addEventListener('goto-quiz', onPending);
     window.addEventListener('start-retry', onRetry);
-    return () => { window.removeEventListener('goto-quiz', onPending); window.removeEventListener('start-retry', onRetry); };
+    window.addEventListener('start-kp-queue', onKpQueue);
+    return () => { window.removeEventListener('goto-quiz', onPending); window.removeEventListener('start-retry', onRetry); window.removeEventListener('start-kp-queue', onKpQueue); };
   }, []);
 
   const loadQuestion = (subj, kpoint) => {
@@ -116,6 +141,22 @@ export default function QuizPanel() {
     }).catch(() => { const next = index + 1; setRetry({ queue, index: next }); loadRetry(next, queue); }).finally(() => setBusy(false));
   };
 
+  // 章节闯关：按章节顺序逐个考点出题，每个考点随机抽一题
+  const loadKp = (index, queue) => {
+    const item = queue[index];
+    if (!item) { setQ(null); setRetry(null); setErr(''); setMsg('🎉 本章闯关完成！'); return; }
+    setSubject(item.subject); setKp(item.knowledgePoint);
+    setBusy(true); setErr(''); setSel(null); setFeedback(null); setFavorited(false);
+    api.quizNext({ subject: item.subject, knowledgePoint: item.knowledgePoint }).then((data) => {
+      if (data && data.question) { setQ(data); started.current = true; }
+      else {
+        const next = index + 1;
+        setRetry({ queue, index: next, mode: 'chapter' });
+        loadKp(next, queue);
+      }
+    }).catch(() => { const next = index + 1; setRetry({ queue, index: next, mode: 'chapter' }); loadKp(next, queue); }).finally(() => setBusy(false));
+  };
+
   const submit = () => {
     if (sel == null || !q) return;
     setBusy(true);
@@ -124,12 +165,16 @@ export default function QuizPanel() {
     }).then((res) => {
       setFeedback({ correct: sel === q.answer, gained: res.points || 0, correctAnswer: q.answer });
       setBusy(false);
-      // 错题重练模式：自动进入下一题（延迟 900ms 让学生看清对错）
+      // 错题重练答对：从该考点错题本移除，让错题本"越刷越少"
+      if (retry && retry.mode === 'retry' && sel === q.answer) {
+        api.removeMistake({ subject, knowledgePoint: kp }).catch(() => {});
+      }
+      // 错题重练/章节闯关模式：自动进入下一题（延迟 900ms 让学生看清对错）
       if (retry) {
         setTimeout(() => {
           const next = retry.index + 1;
-          setRetry({ queue: retry.queue, index: next });
-          loadRetry(next, retry.queue);
+          if (retry.mode === 'chapter') { setRetry({ queue: retry.queue, index: next, mode: 'chapter' }); loadKp(next, retry.queue); }
+          else { setRetry({ queue: retry.queue, index: next }); loadRetry(next, retry.queue); }
         }, 900);
       }
     }).catch((e) => { setErr('提交失败：' + e.message); setBusy(false); });
@@ -139,11 +184,20 @@ export default function QuizPanel() {
     setSel(null); setFeedback(null); setFavorited(false);
     if (retry) {
       const next = retry.index + 1;
-      setRetry({ queue: retry.queue, index: next });
-      loadRetry(next, retry.queue);
+      if (retry.mode === 'chapter') { setRetry({ queue: retry.queue, index: next, mode: 'chapter' }); loadKp(next, retry.queue); }
+      else { setRetry({ queue: retry.queue, index: next }); loadRetry(next, retry.queue); }
     } else {
       loadQuestion(subject, kp);
     }
+  };
+
+  // 闯关模式：按章节顺序自动推进到下一个考点（已点亮的也继续，便于巩固）
+  const goNextKp = () => {
+    const flat = flatKps(outline);
+    const idx = flat.findIndex((x) => x.subject === subject && x.kp === kp);
+    const nxt = idx >= 0 && idx < flat.length - 1 ? flat[idx + 1] : null;
+    if (nxt) { setSubject(nxt.subject); setKp(nxt.kp); loadQuestion(nxt.subject, nxt.kp); }
+    else { setMsg('🎉 已是最后一个考点，闯关完成！'); setTimeout(() => setMsg(''), 1500); }
   };
 
   const onToggleFav = () => {
@@ -158,13 +212,14 @@ export default function QuizPanel() {
   const askCoach = () => {
     if (!q) return;
     window.__pendingChatQuestion = { subject, knowledgePoint: kp, question: q.question, answer: q.answer, options: q.options, explanation: q.explanation };
+    window.__lastQuizCtx = { subject, knowledgePoint: kp, question: q.question, answer: q.answer, options: q.options, explanation: q.explanation };
     window.dispatchEvent(new CustomEvent('goto-tab', { detail: 'chat' }));
   };
 
   return (
     <div className="quiz">
       <h2>刷题</h2>
-      {retry && <p className="quiz-retry-tag">🔁 错题重练中：第 {retry.index + 1} / {retry.queue.length} 题</p>}
+      {retry && <p className="quiz-retry-tag">{retry.mode === 'chapter' ? '📚 章节闯关中' : '🔁 错题重练中'}：第 {retry.index + 1} / {retry.queue.length} 题</p>}
       <div className="quiz-controls">
         <select value={subject} onChange={(e) => {
           const s = e.target.value;
@@ -203,6 +258,7 @@ export default function QuizPanel() {
           )}
         </div>
         <button onClick={() => { setRetry(null); window.__retryQueue = null; if (kp) loadQuestion(subject, kp); else { const all = allKps(subject, outline); if (all.length) loadQuestion(subject, all[0]); else setErr('该科目题库为空'); } }} disabled={busy}>换一题</button>
+        <button className="quiz-next-kp" onClick={() => { setRetry(null); window.__retryQueue = null; goNextKp(); }} disabled={busy}>下一考点 →</button>
       </div>
 
       {!q && showCand && candidates.length === 0 && kp.length > 0 && (
@@ -268,6 +324,7 @@ export default function QuizPanel() {
               {!feedback.correct && q.explanation && <p className="quiz-explain">解析：{q.explanation}</p>}
               <div className="quiz-actions">
                 <button className="quiz-next" onClick={next}>{retry ? '下一题 →' : '下一题'}</button>
+                {!retry && <button className="quiz-next-kp" onClick={() => { setRetry(null); window.__retryQueue = null; goNextKp(); }}>下一考点 →</button>}
                 <button className="quiz-fav" onClick={onToggleFav}>{favorited ? '⭐ 已收藏' : '☆ 收藏难题'}</button>
                 <button className="quiz-ask" onClick={askCoach}>问学长讲讲</button>
                 <button className="quiz-summary" onClick={() => {
@@ -281,7 +338,7 @@ export default function QuizPanel() {
       )}
 
       {!q && !busy && !err && !msg && (
-        <p className="quiz-empty">进入刷题页已自动出题，直接用 👆 做错的题会自动进错题本，也可以从错题本一键「错题重练」。想换考点在上方输入关键词即可。</p>
+        <p className="quiz-empty">进入刷题页已自动出题，直接用 👆 做错的题会自动进错题本（重练答对即移出），也可以从错题本一键「错题重练」。想连着刷下一考点点「下一考点 →」开启闯关；想指定考点在上方输入关键词即可。</p>
       )}
     </div>
   );

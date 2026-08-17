@@ -18,6 +18,12 @@ export function getMistakes(userId) {
   return db.prepare('SELECT * FROM mistakes WHERE user_id=? ORDER BY created_at DESC').all(userId);
 }
 
+// 错题重练答对后，从错题本移除该考点下的错题库（按 用户+科目+考点 整组清除，避免同考点反复出现）
+export function removeMistake(userId, { subject, knowledgePoint }) {
+  db.prepare('DELETE FROM mistakes WHERE user_id=? AND subject=? AND knowledge_point=?').run(userId, subject, knowledgePoint);
+  return { ok: true };
+}
+
 // 收藏/取消收藏一道难题（同一用户+同题 upsert，再次调用则取消）
 export function toggleFavorite(userId, { subject, knowledgePoint, question, answer, options, explanation }) {
   const existing = db.prepare('SELECT id FROM favorites WHERE user_id=? AND question=?').get(userId, question);
